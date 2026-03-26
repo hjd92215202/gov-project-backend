@@ -1,0 +1,58 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+    multipart:
+      max-file-size: 100MB # 允许上传大文件(ZIP等)
+      max-request-size: 500MB
+
+spring:
+  mvc:
+    pathmatch:
+      matching-strategy: ant_path_matcher
+
+  datasource:
+    # 开发环境连本地的 PostgreSQL 即可，部署时换成 openGauss 的 IP
+    url: jdbc:opengauss://localhost:8888/gov_db?useUnicode=true&characterEncoding=utf8
+#    url: jdbc:mariadb://127.0.0.1:3306/gov_db?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
+    username: db_user
+    password: Egov@123
+    driver-class-name: org.opengauss.Driver
+
+  # JSON 格式化时间
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: assign_id # 雪花算法生成ID
+      logic-delete-field: deleted # 逻辑删除字段
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    map-underscore-to-camel-case: true # 开启驼峰命名转换
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开发时打印SQL
+
+# Sa-Token 权限配置
+sa-token:
+  token-name: Authorization
+  timeout: 2592000 # token有效期(秒) 30天
+  is-concurrent: false # 是否允许同一账号并发登录 (政务系统通常为false，顶掉之前的登录)
+  is-share: false # 在多人登录同一账号时，是否共用一个token
+  token-style: uuid # token风格
+
+# MinIO 配置 (自定义配置，后续写配置类读取)
+minio:
+  endpoint: http://127.0.0.1:9000
+  access-key: govadmin
+  secret-key: govadminpassword
+  bucket-name: gov-files
+
+# Flowable 工作流配置
+flowable:
+  database-schema-update: true # 自动建表 (极其重要，启动时会自动在库里建 flowable 的 34 张表)
+  async-executor-activate: false # 如果没有定时任务节点，可以关掉节省资源
