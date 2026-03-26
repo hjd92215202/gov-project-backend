@@ -3,40 +3,45 @@
              xmlns:flowable="http://flowable.org/bpmn"
              targetNamespace="Examples">
 
-    <!-- 定义流程 ID 为 projectApproval -->
-    <process id="projectApproval" name="工程项目审批流程" isExecutable="true">
+    <process id="projectApproval" name="工程项目多级动态审批" isExecutable="true">
 
-        <!-- 1. 开始节点 -->
         <startEvent id="startNode" name="发起申请" />
 
-        <!-- 2. 部门负责人审批节点 -->
-        <userTask id="deptLeaderTask" name="部门负责人审批" flowable:assignee="${deptLeaderId}" />
+        <!-- 核心审批节点：处理人由变量 ${currentAssignee} 决定 -->
+        <userTask id="approveTask" name="逐级审批" flowable:assignee="${currentAssignee}" />
 
-        <!-- 3. 上级领导审批节点 -->
-        <userTask id="topLeaderTask" name="上级领导审批" flowable:assignee="${topLeaderId}" />
+        <!-- 判断：同意还是驳回 -->
+        <exclusiveGateway id="judgeGateway" name="审核结果" />
 
-        <!-- 4. 结束节点 -->
+        <!-- 判断：是否还有下一级上级 -->
+        <exclusiveGateway id="checkNextGateway" name="是否有下一级" />
+
         <endEvent id="endNode" name="审批通过" />
+        <endEvent id="rejectEnd" name="审批驳回" />
 
-        <!-- 连线：开始 -> 部门负责人 -->
-        <sequenceFlow sourceRef="startNode" targetRef="deptLeaderTask" />
+        <!-- 连线逻辑 -->
+        <sequenceFlow sourceRef="startNode" targetRef="approveTask" />
+        <sequenceFlow sourceRef="approveTask" targetRef="judgeGateway" />
 
-        <!-- 连线：部门负责人 -> 上级领导 (条件：approve == true) -->
-        <sequenceFlow sourceRef="deptLeaderTask" targetRef="topLeaderTask">
-            <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                ${approved == true}
-            </conditionExpression>
+        <!-- 驳回：直接连到结束，状态设为驳回 -->
+        <sequenceFlow sourceRef="judgeGateway" targetRef="rejectEnd">
+            <conditionExpression>${approved == false}</conditionExpression>
         </sequenceFlow>
 
-        <!-- 连线：部门负责人 -> 结束 (条件：approved == false，实际业务中可连回发起者，这里演示直接结束并置为驳回状态) -->
-        <sequenceFlow sourceRef="deptLeaderTask" targetRef="startNode">
-            <conditionExpression xsi:type="tFormalExpression" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-                ${approved == false}
-            </conditionExpression>
+        <!-- 同意：进入“是否有下一级”的判断 -->
+        <sequenceFlow sourceRef="judgeGateway" targetRef="checkNextGateway">
+            <conditionExpression>${approved == true}</conditionExpression>
         </sequenceFlow>
 
-        <!-- 连线：上级领导 -> 结束 -->
-        <sequenceFlow sourceRef="topLeaderTask" targetRef="endNode" />
+        <!-- 有下一级：回到 approveTask 节点，由 Java 设置新的 currentAssignee -->
+        <sequenceFlow sourceRef="checkNextGateway" targetRef="approveTask">
+            <conditionExpression>${hasNext == true}</conditionExpression>
+        </sequenceFlow>
+
+        <!-- 没有下一级了：终审通过 -->
+        <sequenceFlow sourceRef="checkNextGateway" targetRef="endNode">
+            <conditionExpression>${hasNext == false}</conditionExpression>
+        </sequenceFlow>
 
     </process>
 </definitions>

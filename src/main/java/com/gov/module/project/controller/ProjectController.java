@@ -1,5 +1,6 @@
 package com.gov.module.project.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -8,6 +9,10 @@ import com.gov.module.flow.service.FlowService;
 import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.ProjectMapVO;
+import com.gov.module.system.entity.SysDept;
+import com.gov.module.system.entity.SysUser;
+import com.gov.module.system.service.SysDeptService;
+import com.gov.module.system.service.SysUserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,7 +28,13 @@ import java.util.Map;
 public class ProjectController {
 
     @Autowired
-    private BizProjectService bizProjectService; // 需要配套建立 service 和 Mapper，和 SysUser 的套路一样
+    private BizProjectService bizProjectService;
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private SysDeptService sysDeptService;
 
     @ApiOperation("录入工程信息")
     @PostMapping("/add")
@@ -44,22 +55,20 @@ public class ProjectController {
     @ApiOperation("录入并提交工程申请")
     @PostMapping("/submit")
     public R<String> submit(@RequestBody BizProject project) {
-        // 1. 保存工程信息到数据库
         bizProjectService.save(project);
 
-        // 2. 准备流程变量 (实际开发中，这些ID应从 sys_dept 表动态查出来)
-        Map<String, Object> vars = new HashMap<>();
-        vars.put("deptLeaderId", "1"); // 假设这是部门负责人ID
-        vars.put("topLeaderId", "1002");  // 假设这是上级领导ID
+        // 1. 获取发起人所属部门负责人
+        SysUser loginUser = sysUserService.getById(StpUtil.getLoginIdAsLong());
+        SysDept dept = sysDeptService.getById(loginUser.getDeptId());
 
-        // 3. 开启审批流，并将工程ID作为 BusinessKey 绑定
+        // 2. 初始变量
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("currentAssignee", dept.getLeaderId().toString());
+
+        // 3. 启动流程
         flowService.startProcess(project.getId().toString(), vars);
 
-        // 4. 更新工程状态为“审批中”
-        project.setStatus(1);
-        bizProjectService.updateById(project);
-
-        return R.ok("工程已提交，进入审批流程");
+        return R.ok("提交成功，请等待部门负责人审核");
     }
 
     @ApiOperation("获取地图展示数据(支持按省市县筛选)")

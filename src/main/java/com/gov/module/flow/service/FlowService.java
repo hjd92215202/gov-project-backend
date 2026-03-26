@@ -4,6 +4,10 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.FlowTaskVO;
+import com.gov.module.system.entity.SysDept;
+import com.gov.module.system.entity.SysUser;
+import com.gov.module.system.service.SysDeptService;
+import com.gov.module.system.service.SysUserService;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -31,6 +35,12 @@ public class FlowService {
 
     @Autowired
     private BizProjectService bizProjectService;
+
+    @Autowired
+    private SysUserService sysUserService;
+
+    @Autowired
+    private SysDeptService sysDeptService;
 
     /**
      * 1. 启动流程
@@ -77,6 +87,9 @@ public class FlowService {
     /**
      * 3. 办理审批 (同意/驳回)
      */
+    /**
+     * 办理审批 (动态多级版)
+     */
     @Transactional
     public void approve(String taskId, boolean approved) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
@@ -85,29 +98,48 @@ public class FlowService {
                 .processInstanceId(processInstanceId)
                 .singleResult().getBusinessKey();
 
-        Map<String, Object> variables = new HashMap<>();
-        variables.put("approved", approved);
-
-        // 1. 完成当前任务
-        taskService.complete(taskId, variables);
-
-        // 2. 更新业务状态
-        BizProject project = new BizProject();
-        project.setId(Long.parseLong(businessKey));
-
         if (!approved) {
-            project.setStatus(3); // 状态：被驳回/退回
-        } else {
-            // 检查流程是否真的结束了
-            // 注意：使用 historyService 检查流程实例是否已结束更准确
-            long activeCount = runtimeService.createProcessInstanceQuery()
-                    .processInstanceId(processInstanceId).count();
-            if (activeCount == 0) {
-                project.setStatus(2); // 状态：已通过
-            } else {
-                project.setStatus(1); // 状态：下一级审批中
-            }
+            // 如果驳回，设置变量让网关走 rejectEnd
+            Map<String, Object> vars = new HashMap<>();
+            vars.put("approved", false);
+            taskService.complete(taskId, vars);
+
+            // 更新业务表
+            updateProjectStatus(businessKey, 3); // 3-已驳回
+            return;
         }
-        bizProjectService.updateById(project);
+
+        // --- 如果是“同意”，需要寻找下一个审批人 ---
+        // 1. 获取当前审批人的部门信息
+        Long currentUserId = Long.parseLong(task.getAssignee());
+        SysUser currentUser = sysUserService.getById(currentUserId);
+        SysDept currentDept = sysDeptService.getById(currentUser.getDeptId());
+
+        // 2. 寻找上级部门及负责人
+        SysDept parentDept = sysDeptService.getById(currentDept.getParentId());
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("approved", true);
+
+        if (parentDept != null && parentDept.getLeaderId() != null) {
+            // 还有上级，设置变量继续循环
+            vars.put("hasNext", true);
+            vars.put("currentAssignee", parentDept.getLeaderId().toString());
+            updateProjectStatus(businessKey, 1); // 依然在审批中
+        } else {
+            // 到头了，没有上级了
+            vars.put("hasNext", false);
+            updateProjectStatus(businessKey, 2); // 终审通过！
+        }
+
+        // 3. 提交任务
+        taskService.complete(taskId, vars);
+    }
+
+    private void updateProjectStatus(String id, Integer status) {
+        BizProject p = new BizProject();
+        p.setId(Long.parseLong(id));
+        p.setStatus(status);
+        bizProjectService.updateById(p);
     }
 }
