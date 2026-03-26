@@ -13,11 +13,11 @@ spring:
 
   datasource:
     # 开发环境连本地的 PostgreSQL 即可，部署时换成 openGauss 的 IP
-    url: jdbc:opengauss://localhost:8888/gov_db?useUnicode=true&characterEncoding=utf8
-#    url: jdbc:mariadb://127.0.0.1:3306/gov_db?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true
+#    url: jdbc:opengauss://localhost:8888/gov_db?useUnicode=true&characterEncoding=utf8
+    url: jdbc:mariadb://localhost:13306/gov_db?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&useInformationSchema=true
     username: db_user
     password: Egov@123
-    driver-class-name: org.opengauss.Driver
+    driver-class-name: org.mariadb.jdbc.Driver
 
   # JSON 格式化时间
   jackson:

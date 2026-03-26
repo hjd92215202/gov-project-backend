@@ -16,8 +16,14 @@ public class BizProject {
     private String projectName;
     private String projectCode;
     private String address;
+
+    private String province; // 省份
+    private String city;     // 城市
+    private String district; // 区县
+
     private BigDecimal longitude; // 经度
     private BigDecimal latitude;  // 纬度
+
     private String leaderName;
 
     /**
@@ -35,4 +41,7 @@ public class BizProject {
 
     @TableField(fill = FieldFill.INSERT)
     private Date createTime;
+
+    @TableField(fill = FieldFill.INSERT_UPDATE) // 如果刚才 SQL 加了 ON UPDATE，这里也可以加上
+    private Date updateTime;
 }

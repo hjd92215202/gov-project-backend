@@ -19,3 +19,14 @@ ALTER USER db_user SYSADMIN;
 
 http://localhost:8080/api/doc.html
 http://localhost:9001/login
+
+docker run --name mdb1 `
+  -v c:\mariadb\data:/var/lib/mysql `
+  -p 13306:3306 `
+  -e MYSQL_ROOT_PASSWORD=123 `
+  -e MYSQL_USER=db_user `
+  -e MYSQL_PASSWORD=Egov@123 `
+  -d mariadb:10.11 `
+  --character-set-server=utf8mb4 `
+  --collation-server=utf8mb4_unicode_ci `
+  --lower_case_table_names=1
