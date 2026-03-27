@@ -38,6 +38,10 @@ public class LoginController {
         Long userId = StpUtil.getLoginIdAsLong();
         SysUser user = sysUserService.getById(userId);
         List<String> roleCodes = sysUserService.getRoleCodes(userId);
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            roleCodes = new ArrayList<>();
+            roleCodes.add("user");
+        }
         SysDept dept = user == null ? null : sysDeptService.getById(user.getDeptId());
 
         Map<String, Object> result = new HashMap<>();
@@ -59,6 +63,10 @@ public class LoginController {
         Long userId = StpUtil.getLoginIdAsLong();
         SysUser user = sysUserService.getById(userId);
         List<String> roleCodes = sysUserService.getRoleCodes(userId);
+        if (roleCodes == null || roleCodes.isEmpty()) {
+            roleCodes = new ArrayList<>();
+            roleCodes.add("user");
+        }
         SysDept dept = user == null ? null : sysDeptService.getById(user.getDeptId());
 
         Map<String, Object> result = new HashMap<>();

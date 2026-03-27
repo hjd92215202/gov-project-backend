@@ -76,6 +76,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return sysRoleMapper.selectBatchIds(roleIds).stream()
                 .map(SysRole::getRoleCode)
                 .filter(Objects::nonNull)
+                .map(this::normalizeRoleCode)
+                .filter(Objects::nonNull)
+                .distinct()
                 .collect(Collectors.toList());
     }
 
@@ -118,5 +121,27 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     public boolean isDeptLeader(Long userId) {
         return getRoleCodes(userId).contains("dept_leader");
+    }
+
+    private String normalizeRoleCode(String roleCode) {
+        if (roleCode == null) {
+            return null;
+        }
+        String code = roleCode.trim().toLowerCase(Locale.ROOT);
+        if (code.isEmpty()) {
+            return null;
+        }
+        if ("admin".equals(code) || "administrator".equals(code) || "super_admin".equals(code)
+                || "superadmin".equals(code) || "role_admin".equals(code)) {
+            return "admin";
+        }
+        if ("dept_leader".equals(code) || "deptleader".equals(code) || "department_leader".equals(code)
+                || "leader".equals(code) || "role_dept_leader".equals(code)) {
+            return "dept_leader";
+        }
+        if ("user".equals(code) || "normal_user".equals(code) || "role_user".equals(code)) {
+            return "user";
+        }
+        return code;
     }
 }

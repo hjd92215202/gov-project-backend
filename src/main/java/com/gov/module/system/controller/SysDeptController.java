@@ -41,10 +41,23 @@ public class SysDeptController {
 
         List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>().orderByAsc(SysDept::getId));
         if (deptList.isEmpty()) {
-            return R.ok(new ArrayList<SysDeptTreeVO>());
+            return R.ok(new ArrayList<>());
         }
-        Map<Long, String> leaderMap = buildLeaderMap(deptList);
 
+        Long scopeRootId = null;
+        if (!isAdmin) {
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (currentUser == null || currentUser.getDeptId() == null) {
+                return R.fail(403, "当前用户未绑定部门，无法查看部门信息");
+            }
+            scopeRootId = currentUser.getDeptId();
+            Set<Long> scopedDeptIds = getScopedDeptIds(scopeRootId, deptList);
+            deptList = deptList.stream()
+                    .filter(item -> scopedDeptIds.contains(item.getId()))
+                    .collect(Collectors.toList());
+        }
+
+        Map<Long, String> leaderMap = buildLeaderMap(deptList);
         List<SysDeptTreeVO> voList = deptList.stream().map(item -> {
             SysDeptTreeVO vo = BeanUtil.copyProperties(item, SysDeptTreeVO.class);
             vo.setLeaderName(leaderMap.get(item.getLeaderId()));
@@ -53,6 +66,7 @@ public class SysDeptController {
 
         Map<Long, SysDeptTreeVO> idMap = voList.stream()
                 .collect(Collectors.toMap(SysDeptTreeVO::getId, item -> item, (a, b) -> a));
+
         List<SysDeptTreeVO> rootList = new ArrayList<>();
         for (SysDeptTreeVO vo : voList) {
             Long parentId = vo.getParentId();
@@ -61,6 +75,15 @@ public class SysDeptController {
             } else {
                 idMap.get(parentId).getChildren().add(vo);
             }
+        }
+
+        if (scopeRootId != null) {
+            for (SysDeptTreeVO root : rootList) {
+                if (Objects.equals(root.getId(), scopeRootId)) {
+                    return R.ok(Collections.singletonList(root));
+                }
+            }
+            return R.ok(new ArrayList<>());
         }
         return R.ok(rootList);
     }
@@ -106,18 +129,44 @@ public class SysDeptController {
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可删除部门");
         }
+
         boolean hasChild = sysDeptService.count(new LambdaQueryWrapper<SysDept>()
                 .eq(SysDept::getParentId, id)) > 0;
         if (hasChild) {
             return R.fail("请先删除子部门");
         }
+
         boolean hasUser = sysUserService.count(new LambdaQueryWrapper<SysUser>()
                 .eq(SysUser::getDeptId, id)) > 0;
         if (hasUser) {
             return R.fail("该部门下仍有用户，无法删除");
         }
+
         sysDeptService.removeById(id);
         return R.ok("删除部门成功");
+    }
+
+    private Set<Long> getScopedDeptIds(Long rootDeptId, List<SysDept> allDeptList) {
+        Map<Long, List<Long>> childMap = new HashMap<>();
+        for (SysDept dept : allDeptList) {
+            Long parentId = dept.getParentId() == null ? 0L : dept.getParentId();
+            childMap.computeIfAbsent(parentId, key -> new ArrayList<>()).add(dept.getId());
+        }
+
+        Set<Long> scopedDeptIds = new HashSet<>();
+        Deque<Long> queue = new ArrayDeque<>();
+        queue.offer(rootDeptId);
+        while (!queue.isEmpty()) {
+            Long deptId = queue.poll();
+            if (deptId == null || !scopedDeptIds.add(deptId)) {
+                continue;
+            }
+            List<Long> children = childMap.get(deptId);
+            if (children != null) {
+                queue.addAll(children);
+            }
+        }
+        return scopedDeptIds;
     }
 
     private Map<Long, String> buildLeaderMap(List<SysDept> deptList) {
