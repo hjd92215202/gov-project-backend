@@ -130,7 +130,7 @@ public class ProjectController {
         if (dbProject == null) {
             return R.fail("项目不存在");
         }
-        if (!isDraftStatus(dbProject.getStatus())) {
+        if (!isEditableStatus(dbProject.getStatus())) {
             return R.fail(403, "仅草稿状态项目可编辑");
         }
         if (!canOperateProject(dbProject)) {
@@ -171,7 +171,7 @@ public class ProjectController {
         if (dbProject == null) {
             return R.fail("项目不存在");
         }
-        if (!isDraftStatus(dbProject.getStatus())) {
+        if (!isEditableStatus(dbProject.getStatus())) {
             return R.fail(403, "仅草稿状态项目可删除");
         }
         if (!canOperateProject(dbProject)) {
@@ -195,7 +195,7 @@ public class ProjectController {
 
         if (project.getId() != null && bizProjectService.getById(project.getId()) != null) {
             BizProject dbProject = bizProjectService.getById(project.getId());
-            if (!isDraftStatus(dbProject.getStatus())) {
+            if (!isEditableStatus(dbProject.getStatus())) {
                 return R.fail(403, "仅草稿状态项目可提交审批");
             }
             if (!canOperateProject(dbProject)) {
@@ -279,6 +279,7 @@ public class ProjectController {
         if (StrUtil.isNotBlank(district)) {
             queryWrapper.eq(BizProject::getDistrict, district);
         }
+        queryWrapper.eq(BizProject::getStatus, 2);
         if (!applyProjectScope(queryWrapper, StpUtil.getLoginIdAsLong())) {
             return R.ok(Collections.emptyList());
         }
@@ -358,7 +359,7 @@ public class ProjectController {
         return null;
     }
 
-    private boolean isDraftStatus(Integer status) {
-        return status == null || Objects.equals(status, 0);
+    private boolean isEditableStatus(Integer status) {
+        return status == null || Objects.equals(status, 0) || Objects.equals(status, 3);
     }
 }
