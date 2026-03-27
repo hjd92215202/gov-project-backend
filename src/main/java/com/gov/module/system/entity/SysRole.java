@@ -11,13 +11,13 @@ import lombok.Data;
 import java.util.Date;
 
 @Data
-@TableName("sys_dept")
-public class SysDept {
+@TableName("sys_role")
+public class SysRole {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
-    private Long parentId;
-    private String deptName;
-    private Long leaderId; // 部门负责人的用户ID
+
+    private String roleName;
+    private String roleCode;
 
     @TableLogic
     private Integer deleted;
@@ -27,7 +27,4 @@ public class SysDept {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
-
-    @TableField(exist = false)
-    private String leaderName;
 }

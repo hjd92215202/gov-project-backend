@@ -28,4 +28,7 @@ public class SysUser implements Serializable {
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
+
+    @TableField(exist = false)
+    private String deptName;
 }
