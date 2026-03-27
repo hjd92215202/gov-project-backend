@@ -8,7 +8,6 @@
     <artifactId>gov-project-backend</artifactId>
     <version>1.0.0</version>
 
-    <!-- 锁定 Spring Boot 2.7.18 (Java 8 的最后一个免费稳定版) -->
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
@@ -18,56 +17,52 @@
 
     <properties>
         <java.version>1.8</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.encoding>UTF-8</maven.compiler.encoding>
         <mybatis-plus.version>3.5.3</mybatis-plus.version>
         <sa-token.version>1.37.0</sa-token.version>
         <flowable.version>6.8.0</flowable.version>
         <minio.version>8.4.3</minio.version>
         <hutool.version>5.8.25</hutool.version>
-        <knife4j.version>3.0.3</knife4j.version> <!-- 接口文档 -->
+        <knife4j.version>3.0.3</knife4j.version>
     </properties>
 
     <dependencies>
-        <!-- 1. Web 核心 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
-        <!-- 2. 数据库与 ORM -->
         <dependency>
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-boot-starter</artifactId>
             <version>${mybatis-plus.version}</version>
         </dependency>
-        <!-- openGauss 官方驱动 (也兼容 PostgreSQL) -->
         <dependency>
             <groupId>org.opengauss</groupId>
             <artifactId>opengauss-jdbc</artifactId>
             <version>3.1.0-og</version>
         </dependency>
 
-        <!-- 3. 权限认证 Sa-Token -->
         <dependency>
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-spring-boot-starter</artifactId>
             <version>${sa-token.version}</version>
         </dependency>
 
-        <!-- 4. 工作流引擎 Flowable -->
         <dependency>
             <groupId>org.flowable</groupId>
             <artifactId>flowable-spring-boot-starter-process</artifactId>
             <version>${flowable.version}</version>
         </dependency>
 
-        <!-- 5. MinIO 对象存储 (注意版本是8.4.3，兼容Java8) -->
         <dependency>
             <groupId>io.minio</groupId>
             <artifactId>minio</artifactId>
             <version>${minio.version}</version>
         </dependency>
 
-        <!-- 6. 国密加解密与工具包 -->
         <dependency>
             <groupId>cn.hutool</groupId>
             <artifactId>hutool-all</artifactId>
@@ -79,14 +74,12 @@
             <version>1.73</version>
         </dependency>
 
-        <!-- 7. 接口文档 Knife4j -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-spring-boot-starter</artifactId>
             <version>${knife4j.version}</version>
         </dependency>
 
-        <!-- 8. 辅助工具 -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
@@ -98,20 +91,17 @@
             <scope>test</scope>
         </dependency>
 
-        <!-- 标准 PostgreSQL 驱动 (用于本地开发) -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
 
-        <!-- MariaDB 驱动 (完美支持 Java 8) -->
         <dependency>
             <groupId>org.mariadb.jdbc</groupId>
             <artifactId>mariadb-java-client</artifactId>
             <version>3.1.4</version>
         </dependency>
-
     </dependencies>
 
     <build>

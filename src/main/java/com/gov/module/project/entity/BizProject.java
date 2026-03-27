@@ -1,13 +1,19 @@
 package com.gov.module.project.entity;
 
-import com.baomidou.mybatisplus.annotation.*;
+import com.baomidou.mybatisplus.annotation.FieldFill;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableLogic;
+import com.baomidou.mybatisplus.annotation.TableName;
 import com.gov.crypto.SmTypeHandler;
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-@TableName(value = "biz_project", autoResultMap = true) // 必须开启 autoResultMap 才能解密
+@TableName(value = "biz_project", autoResultMap = true)
 public class BizProject {
 
     @TableId(type = IdType.ASSIGN_ID)
@@ -17,24 +23,24 @@ public class BizProject {
     private String projectCode;
     private String address;
 
-    private String province; // 省份
-    private String city;     // 城市
-    private String district; // 区县
+    private String province;
+    private String city;
+    private String district;
 
-    private BigDecimal longitude; // 经度
-    private BigDecimal latitude;  // 纬度
+    private BigDecimal longitude;
+    private BigDecimal latitude;
 
     private String leaderName;
 
-    /**
-     * 关键点：使用国密 SM4 加密手机号
-     * 数据库里存的是密文，MyBatis 查询出来自动变成明文
-     */
     @TableField(typeHandler = SmTypeHandler.class)
     private String leaderPhone;
+    @TableField(exist = false)
+    private Long leaderUserId;
 
     private String description;
-    private Integer status; // 0待提交, 1审批中, 2已通过, 3被驳回
+    private Integer status;
+    private Long creatorId;
+    private Long creatorDeptId;
 
     @TableLogic
     private Integer deleted;
@@ -42,6 +48,6 @@ public class BizProject {
     @TableField(fill = FieldFill.INSERT)
     private Date createTime;
 
-    @TableField(fill = FieldFill.INSERT_UPDATE) // 如果刚才 SQL 加了 ON UPDATE，这里也可以加上
+    @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
 }

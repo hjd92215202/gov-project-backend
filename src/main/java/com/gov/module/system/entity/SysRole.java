@@ -18,6 +18,7 @@ public class SysRole {
 
     private String roleName;
     private String roleCode;
+    private String menuPerms;
 
     @TableLogic
     private Integer deleted;

@@ -15,10 +15,19 @@ import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-@Api(tags = "系统部门管理")
+@Api(tags = "部门管理")
 @RestController
 @RequestMapping("/system/dept")
 public class SysDeptController {
@@ -36,7 +45,7 @@ public class SysDeptController {
         boolean isAdmin = sysUserService.isAdmin(currentUserId);
         boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
         if (!isAdmin && !isDeptLeader) {
-            return R.fail(403, "无权访问部门信息");
+            return R.fail(403, "无权限操作 to access departments");
         }
 
         List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>().orderByAsc(SysDept::getId));
@@ -48,13 +57,11 @@ public class SysDeptController {
         if (!isAdmin) {
             SysUser currentUser = sysUserService.getById(currentUserId);
             if (currentUser == null || currentUser.getDeptId() == null) {
-                return R.fail(403, "当前用户未绑定部门，无法查看部门信息");
+                return R.fail(403, "当前用户未绑定部门");
             }
             scopeRootId = currentUser.getDeptId();
             Set<Long> scopedDeptIds = getScopedDeptIds(scopeRootId, deptList);
-            deptList = deptList.stream()
-                    .filter(item -> scopedDeptIds.contains(item.getId()))
-                    .collect(Collectors.toList());
+            deptList = deptList.stream().filter(item -> scopedDeptIds.contains(item.getId())).collect(Collectors.toList());
         }
 
         Map<Long, String> leaderMap = buildLeaderMap(deptList);
@@ -101,7 +108,7 @@ public class SysDeptController {
             dept.setParentId(0L);
         }
         sysDeptService.save(dept);
-        return R.ok("新增部门成功");
+        return R.ok("部门创建成功");
     }
 
     @ApiOperation("更新部门")
@@ -117,10 +124,10 @@ public class SysDeptController {
             return R.fail("部门名称不能为空");
         }
         if (Objects.equals(dept.getId(), dept.getParentId())) {
-            return R.fail("上级部门不能是自己");
+            return R.fail("上级部门不能为自身");
         }
         sysDeptService.updateById(dept);
-        return R.ok("更新部门成功");
+        return R.ok("部门更新成功");
     }
 
     @ApiOperation("删除部门")
@@ -130,20 +137,18 @@ public class SysDeptController {
             return R.fail(403, "仅管理员可删除部门");
         }
 
-        boolean hasChild = sysDeptService.count(new LambdaQueryWrapper<SysDept>()
-                .eq(SysDept::getParentId, id)) > 0;
+        boolean hasChild = sysDeptService.count(new LambdaQueryWrapper<SysDept>().eq(SysDept::getParentId, id)) > 0;
         if (hasChild) {
             return R.fail("请先删除子部门");
         }
 
-        boolean hasUser = sysUserService.count(new LambdaQueryWrapper<SysUser>()
-                .eq(SysUser::getDeptId, id)) > 0;
+        boolean hasUser = sysUserService.count(new LambdaQueryWrapper<SysUser>().eq(SysUser::getDeptId, id)) > 0;
         if (hasUser) {
-            return R.fail("该部门下仍有用户，无法删除");
+            return R.fail("部门下仍有用户，无法删除");
         }
 
         sysDeptService.removeById(id);
-        return R.ok("删除部门成功");
+        return R.ok("部门删除成功");
     }
 
     private Set<Long> getScopedDeptIds(Long rootDeptId, List<SysDept> allDeptList) {
@@ -170,19 +175,15 @@ public class SysDeptController {
     }
 
     private Map<Long, String> buildLeaderMap(List<SysDept> deptList) {
-        Set<Long> userIds = deptList.stream()
-                .map(SysDept::getLeaderId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
+        Set<Long> userIds = deptList.stream().map(SysDept::getLeaderId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (userIds.isEmpty()) {
             return new HashMap<>();
         }
-        return sysUserService.listByIds(userIds).stream()
-                .collect(Collectors.toMap(SysUser::getId, item -> {
-                    if (StrUtil.isNotBlank(item.getRealName())) {
-                        return item.getRealName();
-                    }
-                    return item.getUsername();
-                }, (a, b) -> a));
+        return sysUserService.listByIds(userIds).stream().collect(Collectors.toMap(SysUser::getId, item -> {
+            if (StrUtil.isNotBlank(item.getRealName())) {
+                return item.getRealName();
+            }
+            return item.getUsername();
+        }, (a, b) -> a));
     }
 }
