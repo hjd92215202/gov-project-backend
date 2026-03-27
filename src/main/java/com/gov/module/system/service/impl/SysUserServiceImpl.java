@@ -41,4 +41,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         // 5. 返回 Token 给前端
         return StpUtil.getTokenValue();
     }
+
+    @Override
+    public void logout() {
+        StpUtil.logout();
+    }
 }

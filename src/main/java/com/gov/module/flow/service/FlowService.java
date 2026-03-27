@@ -8,6 +8,8 @@ import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysUserService;
+import org.flowable.engine.history.HistoricProcessInstance;
+import org.flowable.task.api.history.HistoricTaskInstance;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -85,7 +87,42 @@ public class FlowService {
     }
 
     /**
-     * 3. 办理审批 (同意/驳回)
+     * 3. 查询当前用户的已办任务
+     */
+    public List<FlowTaskVO> getDoneList() {
+        String userId = StpUtil.getLoginIdAsString();
+        List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
+                .taskAssignee(userId)
+                .finished()
+                .orderByHistoricTaskInstanceEndTime().desc()
+                .list();
+
+        List<FlowTaskVO> voList = new ArrayList<>();
+        for (HistoricTaskInstance task : tasks) {
+            FlowTaskVO vo = new FlowTaskVO();
+            vo.setTaskId(task.getId());
+            vo.setTaskName(task.getName());
+            vo.setCreateTime(task.getCreateTime());
+            vo.setProcessInstanceId(task.getProcessInstanceId());
+
+            HistoricProcessInstance process = historyService.createHistoricProcessInstanceQuery()
+                    .processInstanceId(task.getProcessInstanceId())
+                    .singleResult();
+            if (process != null) {
+                vo.setBusinessKey(process.getBusinessKey());
+                BizProject project = bizProjectService.getById(process.getBusinessKey());
+                if (project != null) {
+                    vo.setProjectName(project.getProjectName());
+                    vo.setLeaderName(project.getLeaderName());
+                }
+            }
+            voList.add(vo);
+        }
+        return voList;
+    }
+
+    /**
+     * 4. 办理审批 (同意/驳回)
      */
     /**
      * 办理审批 (动态多级版)
@@ -93,6 +130,9 @@ public class FlowService {
     @Transactional
     public void approve(String taskId, boolean approved) {
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        if (task == null) {
+            throw new RuntimeException("审批任务不存在");
+        }
         String processInstanceId = task.getProcessInstanceId();
         String businessKey = runtimeService.createProcessInstanceQuery()
                 .processInstanceId(processInstanceId)

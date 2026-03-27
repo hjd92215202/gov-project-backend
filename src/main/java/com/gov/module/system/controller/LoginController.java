@@ -37,8 +37,7 @@ public class LoginController {
     @ApiOperation("注销接口")
     @PostMapping("/logout")
     public R<String> logout() {
-        // 注销当前会话
-//        sysUserService.loginOut(); // 后续补充此方法或直接StpUtil.logout()
+        sysUserService.logout();
         return R.ok("注销成功");
     }
 }

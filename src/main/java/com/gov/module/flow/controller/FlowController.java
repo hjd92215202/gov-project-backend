@@ -25,6 +25,12 @@ public class FlowController {
         return R.ok(flowService.getTodoList());
     }
 
+    @ApiOperation("获取我的已办任务")
+    @GetMapping("/done")
+    public R<List<FlowTaskVO>> getDone() {
+        return R.ok(flowService.getDoneList());
+    }
+
     @ApiOperation("审批任务(同意或驳回)")
     @PostMapping("/approve")
     public R<String> approve(@RequestBody Map<String, Object> params) {

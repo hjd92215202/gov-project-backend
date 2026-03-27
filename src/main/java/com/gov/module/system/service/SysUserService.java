@@ -9,4 +9,9 @@ public interface SysUserService extends IService<SysUser> {
      * @return 返回生成的 Token
      */
     String login(String username, String password);
+
+    /**
+     * 用户注销逻辑
+     */
+    void logout();
 }
