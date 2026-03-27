@@ -1,5 +1,6 @@
 package com.gov.module.system.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SmUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -39,13 +40,28 @@ public class SysUserController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Long deptId
     ) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+        boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
+        if (!isAdmin && !isDeptLeader) {
+            return R.fail(403, "无权访问用户管理");
+        }
+
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.select(SysUser::getId, SysUser::getDeptId, SysUser::getUsername,
                 SysUser::getRealName, SysUser::getPhone, SysUser::getStatus, SysUser::getCreateTime);
         wrapper.like(StrUtil.isNotBlank(username), SysUser::getUsername, username);
         wrapper.like(StrUtil.isNotBlank(realName), SysUser::getRealName, realName);
         wrapper.eq(status != null, SysUser::getStatus, status);
-        wrapper.eq(deptId != null, SysUser::getDeptId, deptId);
+        if (isAdmin) {
+            wrapper.eq(deptId != null, SysUser::getDeptId, deptId);
+        } else {
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (currentUser == null || currentUser.getDeptId() == null) {
+                return R.fail(403, "当前用户未绑定部门，无法查看用户列表");
+            }
+            wrapper.eq(SysUser::getDeptId, currentUser.getDeptId());
+        }
         wrapper.orderByDesc(SysUser::getCreateTime);
 
         IPage<SysUser> page = sysUserService.page(new Page<>(pageNum, pageSize), wrapper);
@@ -56,16 +72,30 @@ public class SysUserController {
     @ApiOperation("用户下拉列表")
     @GetMapping("/simple")
     public R<List<SysUser>> simple() {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
         wrapper.select(SysUser::getId, SysUser::getUsername, SysUser::getRealName, SysUser::getStatus);
         wrapper.eq(SysUser::getStatus, 1);
+        if (!isAdmin) {
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (currentUser == null || currentUser.getDeptId() == null) {
+                return R.fail(403, "当前用户未绑定部门，无法查看用户列表");
+            }
+            wrapper.eq(SysUser::getDeptId, currentUser.getDeptId());
+        }
         wrapper.orderByAsc(SysUser::getId);
         return R.ok(sysUserService.list(wrapper));
     }
 
     @ApiOperation("新增用户")
     @PostMapping("/add")
-    public R<String> add(@RequestBody SysUser user) {
+    public R<Map<String, Object>> add(@RequestBody SysUser user) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!sysUserService.isAdmin(currentUserId)) {
+            return R.fail(403, "仅管理员可新增用户");
+        }
         if (StrUtil.isBlank(user.getUsername())) {
             return R.fail("用户名不能为空");
         }
@@ -83,18 +113,33 @@ public class SysUserController {
             user.setStatus(1);
         }
         sysUserService.save(user);
-        return R.ok("新增用户成功");
+        Map<String, Object> data = new HashMap<>();
+        data.put("userId", user.getId());
+        return R.ok(data, "新增用户成功");
     }
 
     @ApiOperation("更新用户")
     @PutMapping("/update")
     public R<String> update(@RequestBody SysUser user) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+        boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
+        if (!isAdmin && !isDeptLeader) {
+            return R.fail(403, "无权更新用户");
+        }
         if (user.getId() == null) {
             return R.fail("用户ID不能为空");
         }
         SysUser dbUser = sysUserService.getById(user.getId());
         if (dbUser == null) {
             return R.fail("用户不存在");
+        }
+        if (!isAdmin) {
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (currentUser == null || currentUser.getDeptId() == null
+                    || !Objects.equals(currentUser.getDeptId(), dbUser.getDeptId())) {
+                return R.fail(403, "仅可修改本部门用户");
+            }
         }
 
         SysUser updateEntity = new SysUser();
@@ -115,10 +160,25 @@ public class SysUserController {
     @ApiOperation("更新用户状态")
     @PutMapping("/status")
     public R<String> updateStatus(@RequestBody Map<String, Object> params) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+        boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
+        if (!isAdmin && !isDeptLeader) {
+            return R.fail(403, "无权更新用户状态");
+        }
+
         Long id = params.get("id") == null ? null : Long.parseLong(params.get("id").toString());
         Integer status = params.get("status") == null ? null : Integer.parseInt(params.get("status").toString());
         if (id == null || status == null) {
             return R.fail("参数不能为空");
+        }
+        if (!isAdmin) {
+            SysUser target = sysUserService.getById(id);
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (target == null || currentUser == null || currentUser.getDeptId() == null
+                    || !Objects.equals(currentUser.getDeptId(), target.getDeptId())) {
+                return R.fail(403, "仅可更新本部门用户状态");
+            }
         }
 
         SysUser updateEntity = new SysUser();
@@ -126,6 +186,50 @@ public class SysUserController {
         updateEntity.setStatus(status);
         sysUserService.updateById(updateEntity);
         return R.ok("状态更新成功");
+    }
+
+    @ApiOperation("获取用户角色ID")
+    @GetMapping("/{id}/roles")
+    public R<List<Long>> getUserRoles(@PathVariable Long id) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+        boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
+        if (!isAdmin && !isDeptLeader) {
+            return R.fail(403, "无权查看用户角色");
+        }
+        if (!isAdmin) {
+            SysUser target = sysUserService.getById(id);
+            SysUser currentUser = sysUserService.getById(currentUserId);
+            if (target == null || currentUser == null || currentUser.getDeptId() == null
+                    || !Objects.equals(currentUser.getDeptId(), target.getDeptId())) {
+                return R.fail(403, "仅可查看本部门用户角色");
+            }
+        }
+        return R.ok(sysUserService.getRoleIds(id));
+    }
+
+    @ApiOperation("设置用户角色")
+    @PutMapping("/roles")
+    public R<String> setUserRoles(@RequestBody Map<String, Object> params) {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!sysUserService.isAdmin(currentUserId)) {
+            return R.fail(403, "仅管理员可分配角色");
+        }
+        Long userId = params.get("userId") == null ? null : Long.parseLong(params.get("userId").toString());
+        if (userId == null) {
+            return R.fail("用户ID不能为空");
+        }
+        List<Long> roleIds = new ArrayList<>();
+        Object roleIdsObj = params.get("roleIds");
+        if (roleIdsObj instanceof List) {
+            for (Object item : (List<?>) roleIdsObj) {
+                if (item != null) {
+                    roleIds.add(Long.parseLong(item.toString()));
+                }
+            }
+        }
+        sysUserService.assignRoles(userId, roleIds);
+        return R.ok("角色分配成功");
     }
 
     private void fillDeptName(List<SysUser> users) {

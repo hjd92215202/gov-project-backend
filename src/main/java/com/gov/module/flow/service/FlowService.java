@@ -151,9 +151,21 @@ public class FlowService {
 
         // --- 如果是“同意”，需要寻找下一个审批人 ---
         // 1. 获取当前审批人的部门信息
+        if (task.getAssignee() == null) {
+            throw new RuntimeException("审批任务缺少处理人");
+        }
         Long currentUserId = Long.parseLong(task.getAssignee());
         SysUser currentUser = sysUserService.getById(currentUserId);
+        if (currentUser == null) {
+            throw new RuntimeException("审批处理人不存在");
+        }
+        if (currentUser.getDeptId() == null) {
+            throw new RuntimeException("审批处理人未绑定部门");
+        }
         SysDept currentDept = sysDeptService.getById(currentUser.getDeptId());
+        if (currentDept == null) {
+            throw new RuntimeException("审批处理人所属部门不存在");
+        }
 
         // 2. 寻找上级部门及负责人
         SysDept parentDept = sysDeptService.getById(currentDept.getParentId());

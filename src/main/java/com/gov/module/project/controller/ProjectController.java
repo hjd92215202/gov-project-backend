@@ -115,9 +115,18 @@ public class ProjectController {
 
         // 1. 获取发起人所属部门负责人
         SysUser loginUser = sysUserService.getById(StpUtil.getLoginIdAsLong());
+        if (loginUser == null) {
+            return R.fail("当前登录用户不存在");
+        }
+        if (loginUser.getDeptId() == null) {
+            return R.fail("当前用户未绑定部门，无法提交审批");
+        }
         SysDept dept = sysDeptService.getById(loginUser.getDeptId());
         if (dept == null || dept.getLeaderId() == null) {
             return R.fail("当前用户所属部门未配置负责人，无法提交审批");
+        }
+        if (sysUserService.getById(dept.getLeaderId()) == null) {
+            return R.fail("当前部门负责人账号不存在，无法提交审批");
         }
 
         // 2. 初始变量

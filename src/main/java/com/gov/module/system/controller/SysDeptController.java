@@ -1,5 +1,6 @@
 package com.gov.module.system.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -31,6 +32,13 @@ public class SysDeptController {
     @ApiOperation("部门树")
     @GetMapping("/tree")
     public R<List<SysDeptTreeVO>> tree() {
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        boolean isAdmin = sysUserService.isAdmin(currentUserId);
+        boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
+        if (!isAdmin && !isDeptLeader) {
+            return R.fail(403, "无权访问部门信息");
+        }
+
         List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>().orderByAsc(SysDept::getId));
         if (deptList.isEmpty()) {
             return R.ok(new ArrayList<SysDeptTreeVO>());
@@ -60,6 +68,9 @@ public class SysDeptController {
     @ApiOperation("新增部门")
     @PostMapping("/add")
     public R<String> add(@RequestBody SysDept dept) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可新增部门");
+        }
         if (StrUtil.isBlank(dept.getDeptName())) {
             return R.fail("部门名称不能为空");
         }
@@ -73,6 +84,9 @@ public class SysDeptController {
     @ApiOperation("更新部门")
     @PutMapping("/update")
     public R<String> update(@RequestBody SysDept dept) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可更新部门");
+        }
         if (dept.getId() == null) {
             return R.fail("部门ID不能为空");
         }
@@ -89,6 +103,9 @@ public class SysDeptController {
     @ApiOperation("删除部门")
     @DeleteMapping("/{id}")
     public R<String> delete(@PathVariable Long id) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可删除部门");
+        }
         boolean hasChild = sysDeptService.count(new LambdaQueryWrapper<SysDept>()
                 .eq(SysDept::getParentId, id)) > 0;
         if (hasChild) {

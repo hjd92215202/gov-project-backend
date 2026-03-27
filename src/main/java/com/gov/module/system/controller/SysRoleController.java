@@ -1,5 +1,6 @@
 package com.gov.module.system.controller;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -7,10 +8,13 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
 import com.gov.module.system.entity.SysRole;
 import com.gov.module.system.service.SysRoleService;
+import com.gov.module.system.service.SysUserService;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @Api(tags = "系统角色管理")
 @RestController
@@ -20,6 +24,9 @@ public class SysRoleController {
     @Autowired
     private SysRoleService sysRoleService;
 
+    @Autowired
+    private SysUserService sysUserService;
+
     @ApiOperation("分页查询角色")
     @GetMapping("/page")
     public R<IPage<SysRole>> page(
@@ -28,6 +35,9 @@ public class SysRoleController {
             @RequestParam(required = false) String roleName,
             @RequestParam(required = false) String roleCode
     ) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可访问角色管理");
+        }
         LambdaQueryWrapper<SysRole> wrapper = new LambdaQueryWrapper<>();
         wrapper.like(StrUtil.isNotBlank(roleName), SysRole::getRoleName, roleName);
         wrapper.like(StrUtil.isNotBlank(roleCode), SysRole::getRoleCode, roleCode);
@@ -35,9 +45,20 @@ public class SysRoleController {
         return R.ok(sysRoleService.page(new Page<>(pageNum, pageSize), wrapper));
     }
 
+    @ApiOperation("角色列表")
+    @GetMapping("/all")
+    public R<List<SysRole>> all() {
+        return R.ok(sysRoleService.list(new LambdaQueryWrapper<SysRole>()
+                .select(SysRole::getId, SysRole::getRoleName, SysRole::getRoleCode)
+                .orderByAsc(SysRole::getId)));
+    }
+
     @ApiOperation("新增角色")
     @PostMapping("/add")
     public R<String> add(@RequestBody SysRole role) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可新增角色");
+        }
         if (StrUtil.isBlank(role.getRoleName()) || StrUtil.isBlank(role.getRoleCode())) {
             return R.fail("角色名称和编码不能为空");
         }
@@ -55,6 +76,9 @@ public class SysRoleController {
     @ApiOperation("更新角色")
     @PutMapping("/update")
     public R<String> update(@RequestBody SysRole role) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可更新角色");
+        }
         if (role.getId() == null) {
             return R.fail("角色ID不能为空");
         }
@@ -76,6 +100,9 @@ public class SysRoleController {
     @ApiOperation("删除角色")
     @DeleteMapping("/{id}")
     public R<String> delete(@PathVariable Long id) {
+        if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
+            return R.fail(403, "仅管理员可删除角色");
+        }
         sysRoleService.removeById(id);
         return R.ok("删除角色成功");
     }

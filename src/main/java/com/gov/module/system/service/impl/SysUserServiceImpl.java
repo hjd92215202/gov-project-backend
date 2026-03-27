@@ -4,13 +4,27 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.crypto.SmUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gov.module.system.entity.SysRole;
 import com.gov.module.system.entity.SysUser;
+import com.gov.module.system.entity.SysUserRole;
+import com.gov.module.system.mapper.SysRoleMapper;
 import com.gov.module.system.mapper.SysUserMapper;
+import com.gov.module.system.mapper.SysUserRoleMapper;
 import com.gov.module.system.service.SysUserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
+
+    @Autowired
+    private SysUserRoleMapper sysUserRoleMapper;
+
+    @Autowired
+    private SysRoleMapper sysRoleMapper;
 
     @Override
     public String login(String username, String password) {
@@ -45,5 +59,64 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Override
     public void logout() {
         StpUtil.logout();
+    }
+
+    @Override
+    public List<String> getRoleCodes(Long userId) {
+        if (userId == null) {
+            return new ArrayList<>();
+        }
+        List<Long> roleIds = getRoleIds(userId);
+        if (roleIds.isEmpty()) {
+            if (Long.valueOf(1L).equals(userId)) {
+                return new ArrayList<>(Collections.singletonList("admin"));
+            }
+            return new ArrayList<>();
+        }
+        return sysRoleMapper.selectBatchIds(roleIds).stream()
+                .map(SysRole::getRoleCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public List<Long> getRoleIds(Long userId) {
+        if (userId == null) {
+            return new ArrayList<>();
+        }
+        return sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getUserId, userId))
+                .stream()
+                .map(SysUserRole::getRoleId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void assignRoles(Long userId, List<Long> roleIds) {
+        if (userId == null) {
+            return;
+        }
+        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>().eq(SysUserRole::getUserId, userId));
+        if (roleIds == null || roleIds.isEmpty()) {
+            return;
+        }
+        Set<Long> uniqueRoleIds = roleIds.stream().filter(Objects::nonNull).collect(Collectors.toSet());
+        for (Long roleId : uniqueRoleIds) {
+            SysUserRole userRole = new SysUserRole();
+            userRole.setUserId(userId);
+            userRole.setRoleId(roleId);
+            sysUserRoleMapper.insert(userRole);
+        }
+    }
+
+    @Override
+    public boolean isAdmin(Long userId) {
+        return getRoleCodes(userId).contains("admin");
+    }
+
+    @Override
+    public boolean isDeptLeader(Long userId) {
+        return getRoleCodes(userId).contains("dept_leader");
     }
 }
