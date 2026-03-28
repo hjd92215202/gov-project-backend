@@ -160,6 +160,7 @@ SQL/bootstrap references:
 1. Encoding history risk:
    - Some files previously had text encoding issues (mojibake) in comments/messages.
    - Keep all edits UTF-8 without BOM.
+   - Follow .editorconfig on every edit; the repo encoding baseline is UTF-8 without BOM.
 2. Permission complexity:
    - Menu-based permissions + role codes + dept leader fallback can conflict if changed carelessly.
 3. Message consistency:
@@ -184,4 +185,4 @@ SQL/bootstrap references:
   - response wrapper = R
   - editable project statuses = 0 and 3
   - map endpoint defaults to approved status only
-- Preserve UTF-8 and do not relax permission boundaries accidentally.
+- Follow `.editorconfig`, preserve UTF-8 without BOM, and do not relax permission boundaries accidentally.

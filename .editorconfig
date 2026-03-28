@@ -1,6 +1,7 @@
 root = true
 
 [*]
+# In EditorConfig, utf-8 means UTF-8 without BOM. Keep source files BOM-free.
 charset = utf-8
 end_of_line = lf
 insert_final_newline = true
