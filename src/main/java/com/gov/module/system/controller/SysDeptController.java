@@ -5,6 +5,8 @@ import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.gov.common.result.R;
+import com.gov.module.system.dto.DeptCreateDTO;
+import com.gov.module.system.dto.DeptUpdateDTO;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
@@ -27,6 +29,10 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+/**
+ * 部门管理接口控制器。
+ * 该类负责部门树展示、部门增删改，以及在部门树场景下按角色裁剪可见范围。
+ */
 @Api(tags = "部门管理")
 @RestController
 @RequestMapping("/system/dept")
@@ -38,6 +44,11 @@ public class SysDeptController {
     @Autowired
     private SysUserService sysUserService;
 
+    /**
+     * 获取部门树。
+     *
+     * @return 部门树结果
+     */
     @ApiOperation("部门树")
     @GetMapping("/tree")
     public R<List<SysDeptTreeVO>> tree() {
@@ -45,7 +56,7 @@ public class SysDeptController {
         boolean isAdmin = sysUserService.isAdmin(currentUserId);
         boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
         if (!isAdmin && !isDeptLeader) {
-            return R.fail(403, "无权限操作 to access departments");
+            return R.fail(403, "无权限查看部门信息");
         }
 
         List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>().orderByAsc(SysDept::getId));
@@ -95,9 +106,16 @@ public class SysDeptController {
         return R.ok(rootList);
     }
 
+    /**
+     * 新增部门。
+     *
+     * @param payload 部门创建 DTO
+     * @return 创建结果
+     */
     @ApiOperation("新增部门")
     @PostMapping("/add")
-    public R<String> add(@RequestBody SysDept dept) {
+    public R<String> add(@RequestBody DeptCreateDTO payload) {
+        SysDept dept = toCreateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可新增部门");
         }
@@ -111,9 +129,16 @@ public class SysDeptController {
         return R.ok("部门创建成功");
     }
 
+    /**
+     * 更新部门。
+     *
+     * @param payload 部门更新 DTO
+     * @return 更新结果
+     */
     @ApiOperation("更新部门")
     @PutMapping("/update")
-    public R<String> update(@RequestBody SysDept dept) {
+    public R<String> update(@RequestBody DeptUpdateDTO payload) {
+        SysDept dept = toUpdateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可更新部门");
         }
@@ -130,6 +155,12 @@ public class SysDeptController {
         return R.ok("部门更新成功");
     }
 
+    /**
+     * 删除部门。
+     *
+     * @param id 部门 ID
+     * @return 删除结果
+     */
     @ApiOperation("删除部门")
     @DeleteMapping("/{id}")
     public R<String> delete(@PathVariable Long id) {
@@ -151,6 +182,48 @@ public class SysDeptController {
         return R.ok("部门删除成功");
     }
 
+    /**
+     * 把创建 DTO 转为部门实体。
+     *
+     * @param payload 创建 DTO
+     * @return 部门实体
+     */
+    private SysDept toCreateDeptEntity(DeptCreateDTO payload) {
+        SysDept dept = new SysDept();
+        if (payload == null) {
+            return dept;
+        }
+        dept.setParentId(payload.getParentId());
+        dept.setDeptName(payload.getDeptName());
+        dept.setLeaderId(payload.getLeaderId());
+        return dept;
+    }
+
+    /**
+     * 把更新 DTO 转为部门实体。
+     *
+     * @param payload 更新 DTO
+     * @return 部门实体
+     */
+    private SysDept toUpdateDeptEntity(DeptUpdateDTO payload) {
+        SysDept dept = new SysDept();
+        if (payload == null) {
+            return dept;
+        }
+        dept.setId(payload.getId());
+        dept.setParentId(payload.getParentId());
+        dept.setDeptName(payload.getDeptName());
+        dept.setLeaderId(payload.getLeaderId());
+        return dept;
+    }
+
+    /**
+     * 在已有部门列表中计算指定根部门的可见范围。
+     *
+     * @param rootDeptId 根部门 ID
+     * @param allDeptList 全量部门列表
+     * @return 部门范围集合
+     */
     private Set<Long> getScopedDeptIds(Long rootDeptId, List<SysDept> allDeptList) {
         Map<Long, List<Long>> childMap = new HashMap<>();
         for (SysDept dept : allDeptList) {
@@ -174,6 +247,12 @@ public class SysDeptController {
         return scopedDeptIds;
     }
 
+    /**
+     * 批量构建部门负责人姓名映射。
+     *
+     * @param deptList 部门列表
+     * @return 负责人姓名映射
+     */
     private Map<Long, String> buildLeaderMap(List<SysDept> deptList) {
         Set<Long> userIds = deptList.stream().map(SysDept::getLeaderId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (userIds.isEmpty()) {

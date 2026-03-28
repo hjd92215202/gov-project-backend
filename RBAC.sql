@@ -1,18 +1,11 @@
--- 创建数据库（如不存在）
 DROP DATABASE IF EXISTS gov_db;
 CREATE DATABASE gov_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE gov_db;
 
--- 1. 确保业务账号拥有库级权限
 GRANT ALL PRIVILEGES ON gov_db.* TO 'db_user'@'%';
-
--- 2. 授予全局元数据相关权限（用于驱动探测）
 GRANT SHOW DATABASES, REFERENCES ON *.* TO 'db_user'@'%';
-
--- 3. 刷新权限生效
 FLUSH PRIVILEGES;
 
--- 按依赖顺序清理旧表
 DROP TABLE IF EXISTS sys_file;
 DROP TABLE IF EXISTS biz_project;
 DROP TABLE IF EXISTS sys_user_role;
@@ -20,31 +13,28 @@ DROP TABLE IF EXISTS sys_user;
 DROP TABLE IF EXISTS sys_role;
 DROP TABLE IF EXISTS sys_dept;
 
--- 1. 部门表
 CREATE TABLE sys_dept (
     id BIGINT NOT NULL COMMENT '主键',
-    parent_id BIGINT DEFAULT 0 COMMENT '上级部门标识（顶级为0）',
+    parent_id BIGINT DEFAULT 0 COMMENT '上级部门标识，顶级为0',
     dept_name VARCHAR(50) NOT NULL COMMENT '部门名称',
     leader_id BIGINT DEFAULT NULL COMMENT '部门负责人用户标识',
-    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除：0正常，1删除',
+    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除标记，0正常，1删除',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='部门表';
 
--- 2. 角色表
 CREATE TABLE sys_role (
     id BIGINT NOT NULL COMMENT '主键',
     role_name VARCHAR(50) NOT NULL COMMENT '角色名称',
     role_code VARCHAR(50) NOT NULL COMMENT '角色编码',
     menu_perms VARCHAR(1000) DEFAULT NULL COMMENT '菜单权限键集合（逗号分隔）',
-    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除：0正常，1删除',
+    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除标记，0正常，1删除',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='角色表';
 
--- 3. 用户表
 CREATE TABLE sys_user (
     id BIGINT NOT NULL COMMENT '主键',
     dept_id BIGINT DEFAULT NULL COMMENT '所属部门标识',
@@ -53,13 +43,12 @@ CREATE TABLE sys_user (
     real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
     phone VARCHAR(20) DEFAULT NULL COMMENT '手机号',
     status SMALLINT DEFAULT 1 COMMENT '状态：1启用，0停用',
-    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除：0正常，1删除',
+    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除标记，0正常，1删除',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 
--- 4. 用户角色关联表
 CREATE TABLE sys_user_role (
     id BIGINT NOT NULL COMMENT '主键',
     user_id BIGINT NOT NULL COMMENT '用户标识',
@@ -67,7 +56,6 @@ CREATE TABLE sys_user_role (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户角色关联表';
 
--- 5. 项目表
 CREATE TABLE biz_project (
     id BIGINT NOT NULL COMMENT '主键',
     project_name VARCHAR(200) NOT NULL COMMENT '项目名称',
@@ -84,13 +72,12 @@ CREATE TABLE biz_project (
     status INT DEFAULT 0 COMMENT '状态：0待提交，1审批中，2已通过，3已驳回',
     creator_id BIGINT DEFAULT NULL COMMENT '创建人用户标识',
     creator_dept_id BIGINT DEFAULT NULL COMMENT '创建人部门标识',
-    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除：0正常，1删除',
+    deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除标记，0正常，1删除',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='项目表';
 
--- 6. 文件表
 CREATE TABLE sys_file (
     id BIGINT NOT NULL COMMENT '主键',
     biz_id BIGINT DEFAULT NULL COMMENT '业务标识',
@@ -102,17 +89,30 @@ CREATE TABLE sys_file (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件表';
 
--- 初始化数据
+CREATE INDEX idx_sys_dept_parent_id ON sys_dept(parent_id);
+CREATE INDEX idx_sys_dept_leader_id ON sys_dept(leader_id);
+CREATE INDEX idx_sys_role_role_code ON sys_role(role_code);
+CREATE INDEX idx_sys_user_username ON sys_user(username);
+CREATE INDEX idx_sys_user_dept_status ON sys_user(dept_id, status);
+CREATE INDEX idx_sys_user_role_user_id ON sys_user_role(user_id);
+CREATE INDEX idx_sys_user_role_role_id ON sys_user_role(role_id);
+CREATE INDEX idx_biz_project_creator_status_time ON biz_project(creator_id, status, create_time);
+CREATE INDEX idx_biz_project_creator_dept_status_time ON biz_project(creator_dept_id, status, create_time);
+CREATE INDEX idx_biz_project_status_region ON biz_project(status, province, city, district);
+
 INSERT INTO sys_role (id, role_name, role_code, menu_perms)
 VALUES (1, '系统管理员', 'admin', 'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role');
 
 INSERT INTO sys_dept (id, parent_id, dept_name)
-VALUES (1, 0, '总经办');
+VALUES (1, 0, '综合部');
 
 INSERT INTO sys_user (id, dept_id, username, password, real_name, status, deleted)
 VALUES (1, 1, 'admin', '66d7edc85a32d756ffef0046a56cf78060276b6beb3f02de7916c01ad54ea6b0', '超级管理员', 1, 0);
 
-INSERT INTO biz_project (id, project_name, project_code, address, province, city, district, longitude, latitude, leader_name, leader_phone, status)
+INSERT INTO biz_project (
+    id, project_name, project_code, address, province, city, district,
+    longitude, latitude, leader_name, leader_phone, status, creator_id, creator_dept_id
+)
 VALUES
-(2, '西安市莲湖区老旧改造工程', 'GC-002', '陕西省西安市莲湖区XX路', '陕西省', '西安市', '莲湖区', 108.91000, 34.27000, '李四', '13911112222', 1),
-(3, '咸阳市某桥梁项目', 'GC-003', '陕西省咸阳市秦都区YY路', '陕西省', '咸阳市', '秦都区', 108.70000, 34.33000, '王五', '13566667777', 1);
+    (2, '西安市莲湖区老旧改造工程', 'GC-002', '陕西省西安市莲湖区XX路', '陕西省', '西安市', '莲湖区', 108.9100000, 34.2700000, '李四', '13911112222', 1, 1, 1),
+    (3, '咸阳市某桥梁项目', 'GC-003', '陕西省咸阳市秦都区BY路', '陕西省', '咸阳市', '秦都区', 108.7000000, 34.3300000, '王五', '13566667777', 1, 1, 1);

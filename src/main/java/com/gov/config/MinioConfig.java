@@ -5,6 +5,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * MinIO 配置。
+ * 统一创建可注入的 MinioClient，供文件上传控制器直接复用。
+ */
 @Configuration
 public class MinioConfig {
 
@@ -17,6 +21,9 @@ public class MinioConfig {
     @Value("${minio.secret-key}")
     private String secretKey;
 
+    /**
+     * 构建 MinIO 客户端。
+     */
     @Bean
     public MinioClient minioClient() {
         return MinioClient.builder()

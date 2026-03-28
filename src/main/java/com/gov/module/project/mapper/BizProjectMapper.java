@@ -5,9 +5,9 @@ import com.gov.module.project.entity.BizProject;
 import org.apache.ibatis.annotations.Mapper;
 
 /**
- * 工程项目 Mapper 接口
+ * 项目 Mapper。
+ * 负责项目表与数据库之间的底层映射。
  */
 @Mapper
 public interface BizProjectMapper extends BaseMapper<BizProject> {
-    // 所有的 CRUD 逻辑已经由 MyBatis-Plus 的 BaseMapper 提供
 }

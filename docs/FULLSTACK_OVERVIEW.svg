@@ -1,0 +1,175 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1080" viewBox="0 0 1600 1080">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L10,3 L0,6 Z" fill="#4b5563"/>
+    </marker>
+    <style>
+      .title { font: 700 28px 'Microsoft YaHei', 'PingFang SC', sans-serif; fill: #111827; }
+      .subtitle { font: 600 18px 'Microsoft YaHei', 'PingFang SC', sans-serif; fill: #1f2937; }
+      .label { font: 500 15px 'Microsoft YaHei', 'PingFang SC', sans-serif; fill: #1f2937; }
+      .small { font: 500 13px 'Microsoft YaHei', 'PingFang SC', sans-serif; fill: #374151; }
+      .note { font: 500 12px 'Microsoft YaHei', 'PingFang SC', sans-serif; fill: #4b5563; }
+      .panel { fill: #ffffff; stroke: #d1d5db; stroke-width: 1.5; rx: 20; }
+      .box-blue { fill: #e0f2fe; stroke: #0284c7; stroke-width: 1.5; rx: 14; }
+      .box-green { fill: #dcfce7; stroke: #16a34a; stroke-width: 1.5; rx: 14; }
+      .box-orange { fill: #ffedd5; stroke: #ea580c; stroke-width: 1.5; rx: 14; }
+      .box-purple { fill: #f3e8ff; stroke: #9333ea; stroke-width: 1.5; rx: 14; }
+      .box-gray { fill: #f3f4f6; stroke: #6b7280; stroke-width: 1.5; rx: 14; }
+      .line { stroke: #4b5563; stroke-width: 2.2; fill: none; marker-end: url(#arrow); }
+      .dashed { stroke-dasharray: 7 6; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1080" fill="#f8fafc"/>
+  <text x="48" y="50" class="title">政务项目系统前后端总图</text>
+  <text x="48" y="80" class="small">从上到下看架构，从左到右看主链路</text>
+
+  <rect x="40" y="110" width="460" height="500" class="panel"/>
+  <text x="60" y="145" class="subtitle">前端 gov-web</text>
+
+  <rect x="60" y="170" width="170" height="64" class="box-blue"/>
+  <text x="84" y="208" class="label">Vue 3 + Vite</text>
+
+  <rect x="260" y="170" width="210" height="64" class="box-blue"/>
+  <text x="294" y="208" class="label">Vue Router + Layout</text>
+
+  <rect x="60" y="260" width="170" height="64" class="box-blue"/>
+  <text x="96" y="298" class="label">Pinia Session</text>
+
+  <rect x="260" y="260" width="210" height="64" class="box-blue"/>
+  <text x="312" y="298" class="label">Views 页面层</text>
+
+  <rect x="60" y="350" width="170" height="64" class="box-blue"/>
+  <text x="93" y="388" class="label">models 适配层</text>
+
+  <rect x="260" y="350" width="210" height="64" class="box-blue"/>
+  <text x="322" y="388" class="label">api 业务封装</text>
+
+  <rect x="60" y="440" width="170" height="64" class="box-blue"/>
+  <text x="102" y="478" class="label">request.js</text>
+
+  <rect x="260" y="440" width="210" height="64" class="box-blue"/>
+  <text x="325" y="470" class="label">feedback.js</text>
+  <text x="302" y="490" class="note">统一中文提示 / 确认框</text>
+
+  <line x1="145" y1="234" x2="145" y2="260" class="line"/>
+  <line x1="365" y1="234" x2="365" y2="260" class="line"/>
+  <line x1="145" y1="324" x2="145" y2="350" class="line"/>
+  <line x1="365" y1="324" x2="365" y2="350" class="line"/>
+  <line x1="230" y1="382" x2="260" y2="382" class="line"/>
+  <line x1="365" y1="414" x2="365" y2="440" class="line"/>
+
+  <rect x="560" y="110" width="520" height="500" class="panel"/>
+  <text x="580" y="145" class="subtitle">后端 gov-project-backend</text>
+
+  <rect x="580" y="170" width="140" height="64" class="box-green"/>
+  <text x="623" y="208" class="label">Controller</text>
+
+  <rect x="750" y="170" width="140" height="64" class="box-green"/>
+  <text x="800" y="208" class="label">DTO</text>
+
+  <rect x="920" y="170" width="140" height="64" class="box-green"/>
+  <text x="975" y="208" class="label">VO</text>
+
+  <rect x="580" y="270" width="140" height="70" class="box-green"/>
+  <text x="627" y="302" class="label">Service</text>
+  <text x="604" y="323" class="note">业务 / 权限 / 状态机</text>
+
+  <rect x="750" y="270" width="140" height="70" class="box-green"/>
+  <text x="784" y="302" class="label">FlowService</text>
+  <text x="770" y="323" class="note">审批推进</text>
+
+  <rect x="920" y="270" width="140" height="70" class="box-green"/>
+  <text x="950" y="302" class="label">Mapper</text>
+  <text x="938" y="323" class="note">MyBatis-Plus</text>
+
+  <rect x="580" y="380" width="140" height="70" class="box-green"/>
+  <text x="611" y="412" class="label">R 统一返回</text>
+  <text x="600" y="433" class="note">code / msg / data</text>
+
+  <rect x="750" y="380" width="140" height="70" class="box-green"/>
+  <text x="766" y="412" class="label">异常处理</text>
+  <text x="760" y="433" class="note">统一中文错误消息</text>
+
+  <rect x="920" y="380" width="140" height="70" class="box-green"/>
+  <text x="963" y="412" class="label">Sa-Token</text>
+  <text x="946" y="433" class="note">登录态 / 权限校验</text>
+
+  <rect x="665" y="490" width="300" height="74" class="box-green"/>
+  <text x="742" y="522" class="label">SchemaPatchRunner</text>
+  <text x="725" y="545" class="note">索引补丁 / 启动时自动收敛</text>
+
+  <line x1="650" y1="234" x2="650" y2="270" class="line"/>
+  <line x1="820" y1="234" x2="820" y2="270" class="line dashed"/>
+  <line x1="990" y1="234" x2="990" y2="270" class="line dashed"/>
+  <line x1="650" y1="340" x2="650" y2="380" class="line"/>
+  <line x1="820" y1="340" x2="820" y2="380" class="line"/>
+  <line x1="990" y1="340" x2="990" y2="380" class="line"/>
+  <line x1="820" y1="450" x2="820" y2="490" class="line"/>
+
+  <rect x="1140" y="110" width="420" height="500" class="panel"/>
+  <text x="1160" y="145" class="subtitle">外部依赖与数据</text>
+
+  <rect x="1160" y="180" width="170" height="74" class="box-orange"/>
+  <text x="1218" y="212" class="label">MariaDB</text>
+  <text x="1186" y="235" class="note">sys_user / sys_role / sys_dept</text>
+
+  <rect x="1360" y="180" width="170" height="74" class="box-orange"/>
+  <text x="1408" y="212" class="label">Flowable</text>
+  <text x="1371" y="235" class="note">projectApproval 流程定义</text>
+
+  <rect x="1160" y="300" width="170" height="74" class="box-orange"/>
+  <text x="1217" y="332" class="label">MinIO</text>
+  <text x="1198" y="355" class="note">公共文件上传 / 存储</text>
+
+  <rect x="1360" y="300" width="170" height="74" class="box-orange"/>
+  <text x="1394" y="332" class="label">状态机</text>
+  <text x="1380" y="355" class="note">0待提交 1审批中 2通过 3驳回</text>
+
+  <line x1="1060" y1="305" x2="1160" y2="217" class="line"/>
+  <line x1="890" y1="305" x2="1360" y2="217" class="line"/>
+  <line x1="650" y1="305" x2="1160" y2="337" class="line"/>
+
+  <line x1="470" y1="472" x2="580" y2="202" class="line"/>
+  <text x="470" y="335" class="small">/api + Authorization</text>
+
+  <rect x="40" y="650" width="1520" height="370" class="panel"/>
+  <text x="60" y="685" class="subtitle">五条跨端主链路</text>
+
+  <rect x="60" y="720" width="260" height="110" class="box-purple"/>
+  <text x="80" y="752" class="label">1. 登录</text>
+  <text x="80" y="778" class="small">login.vue -> session.js -> /system/login</text>
+  <text x="80" y="802" class="small">返回 token + userInfo + roleCodes + menuKeys + homePath</text>
+
+  <rect x="350" y="720" width="260" height="110" class="box-purple"/>
+  <text x="370" y="752" class="label">2. 项目分页</text>
+  <text x="370" y="778" class="small">manage.vue -> api/project.js -> /project/page</text>
+  <text x="370" y="802" class="small">ProjectController 按权限范围查询 ProjectPageVO</text>
+
+  <rect x="640" y="720" width="260" height="110" class="box-purple"/>
+  <text x="660" y="752" class="label">3. 提交审批</text>
+  <text x="660" y="778" class="small">/project/submit 校验状态与权限</text>
+  <text x="660" y="802" class="small">FlowService.startProcess -> Flowable 启动流程</text>
+
+  <rect x="930" y="720" width="260" height="110" class="box-purple"/>
+  <text x="950" y="752" class="label">4. 审批通过 / 驳回</text>
+  <text x="950" y="778" class="small">engineering.vue -> /flow/approve</text>
+  <text x="950" y="802" class="small">驳回改 3；同意则逐级上推，最终改 2</text>
+
+  <rect x="1220" y="720" width="300" height="110" class="box-purple"/>
+  <text x="1240" y="752" class="label">5. 地图展示</text>
+  <text x="1240" y="778" class="small">dashboard.vue -> /project/map/list</text>
+  <text x="1240" y="802" class="small">仅展示 status=2 已通过项目 -> ECharts 点位</text>
+
+  <line x1="320" y1="775" x2="350" y2="775" class="line"/>
+  <line x1="610" y1="775" x2="640" y2="775" class="line"/>
+  <line x1="900" y1="775" x2="930" y2="775" class="line"/>
+  <line x1="1190" y1="775" x2="1220" y2="775" class="line"/>
+
+  <rect x="60" y="865" width="1460" height="115" class="box-gray"/>
+  <text x="82" y="897" class="label">看全局时最重要的 4 个抓手</text>
+  <text x="82" y="925" class="small">1. token 只是入口，真正的权限核心是 roleCodes + menuKeys + UserAccessContext。</text>
+  <text x="82" y="948" class="small">2. 项目状态机贯穿前后端：0 待提交，1 审批中，2 已通过，3 已驳回。</text>
+  <text x="82" y="971" class="small">3. 审批流和项目管理共用同一份项目数据，只是一个从 CRUD 入口进入，一个从 Flowable 任务入口进入。</text>
+  <text x="82" y="994" class="small">4. 地图不是独立业务，它是“审批通过项目”的可视化投影视图。</text>
+</svg>

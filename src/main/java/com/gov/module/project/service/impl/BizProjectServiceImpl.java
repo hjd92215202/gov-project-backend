@@ -7,9 +7,10 @@ import com.gov.module.project.service.BizProjectService;
 import org.springframework.stereotype.Service;
 
 /**
- * 工程项目 Service 实现类
+ * 项目服务实现。
+ * 当前主要复用 MyBatis-Plus 提供的通用 CRUD 能力，
+ * 后续若项目领域逻辑继续下沉，可以直接在这里扩展。
  */
 @Service
 public class BizProjectServiceImpl extends ServiceImpl<BizProjectMapper, BizProject> implements BizProjectService {
-    // 基础的保存(save)、更新(updateById)、查询(getById) 已自动拥有
 }
