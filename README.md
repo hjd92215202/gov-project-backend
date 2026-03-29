@@ -30,3 +30,5 @@ docker run --name mdb1 `
   --character-set-server=utf8mb4 `
   --collation-server=utf8mb4_unicode_ci `
   --lower_case_table_names=1
+
+v1
