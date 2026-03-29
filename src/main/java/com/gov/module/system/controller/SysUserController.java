@@ -47,6 +47,8 @@ import java.util.stream.Collectors;
 @RequestMapping("/system/user")
 public class SysUserController {
 
+    private static final String PHONE_REGEX = "^[0-9-]{7,20}$";
+
     @Autowired
     private SysUserService sysUserService;
 
@@ -187,6 +189,11 @@ public class SysUserController {
             user.setStatus(1);
         }
 
+        String phoneError = normalizeAndValidatePhone(user);
+        if (phoneError != null) {
+            return R.fail(phoneError);
+        }
+
         sysUserService.save(user);
         if (accessContext.isAdmin() && user.getRoleIds() != null) {
             sysUserService.assignRoles(user.getId(), user.getRoleIds());
@@ -213,6 +220,11 @@ public class SysUserController {
         }
         if (user.getId() == null) {
             return R.fail("用户ID不能为空");
+        }
+
+        String phoneError = normalizeAndValidatePhone(user);
+        if (phoneError != null) {
+            return R.fail(phoneError);
         }
 
         SysUser dbUser = sysUserService.getById(user.getId());
@@ -392,6 +404,29 @@ public class SysUserController {
         user.setPassword(payload.getPassword());
         user.setRoleIds(payload.getRoleIds());
         return user;
+    }
+
+    /**
+     * 规范并校验手机号格式，返回友好的错误提示。
+     *
+     * @param user 用户实体
+     * @return 错误提示，校验通过返回 null
+     */
+    private String normalizeAndValidatePhone(SysUser user) {
+        if (user == null) {
+            return null;
+        }
+        String phone = user.getPhone();
+        if (StrUtil.isBlank(phone)) {
+            user.setPhone(null);
+            return null;
+        }
+        String normalized = phone.trim();
+        user.setPhone(normalized);
+        if (!normalized.matches(PHONE_REGEX)) {
+            return "手机号格式不正确，请输入7-20位数字，可包含\"-\"";
+        }
+        return null;
     }
 
     /**

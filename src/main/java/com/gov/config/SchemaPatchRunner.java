@@ -40,6 +40,7 @@ public class SchemaPatchRunner implements CommandLineRunner {
                 + "PRIMARY KEY (id)"
                 + ")");
 
+        safeExec("ALTER TABLE sys_user MODIFY phone VARCHAR(255) DEFAULT NULL COMMENT '手机号（数据库中为密文）'");
         safeExec("CREATE INDEX idx_sys_user_username ON sys_user(username)");
         safeExec("CREATE INDEX idx_sys_user_dept_status ON sys_user(dept_id, status)");
         safeExec("CREATE INDEX idx_sys_user_role_user_id ON sys_user_role(user_id)");

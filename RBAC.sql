@@ -42,7 +42,7 @@ CREATE TABLE sys_user (
     username VARCHAR(50) NOT NULL COMMENT '用户名',
     password VARCHAR(255) NOT NULL COMMENT '密码密文',
     real_name VARCHAR(50) DEFAULT NULL COMMENT '真实姓名',
-    phone VARCHAR(20) DEFAULT NULL COMMENT '手机号（数据库中为密文）',
+    phone VARCHAR(255) DEFAULT NULL COMMENT '手机号（数据库中为密文）',
     status SMALLINT DEFAULT 1 COMMENT '状态：1启用，0停用',
     deleted SMALLINT DEFAULT 0 COMMENT '逻辑删除标记，0正常1删除',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
