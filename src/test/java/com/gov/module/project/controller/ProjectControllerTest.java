@@ -203,7 +203,7 @@ class ProjectControllerTest {
             R<String> result = controller.add(payload);
 
             assertEquals(Integer.valueOf(500), result.getCode());
-            assertEquals("联系电话格式不正确，请填写11位手机号", result.getMsg());
+            assertEquals("联系电话格式不正确，请填写7到20位数字，可包含短横线", result.getMsg());
             verify(bizProjectService, never()).save(any(BizProject.class));
         }
     }

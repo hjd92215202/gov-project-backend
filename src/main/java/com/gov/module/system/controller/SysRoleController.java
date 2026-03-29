@@ -107,6 +107,7 @@ public class SysRoleController {
         data.add(menuItem("system:user", "用户管理"));
         data.add(menuItem("system:dept", "部门管理"));
         data.add(menuItem("system:role", "角色管理"));
+        data.add(menuItem("system:audit", "审计日志"));
         return R.ok(data);
     }
 

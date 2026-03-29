@@ -47,7 +47,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     );
     /** 管理员默认菜单。 */
     private static final List<String> ADMIN_DEFAULT_MENUS = Arrays.asList(
-            "dashboard:view", "project:manage", "project:engineering", "system:user", "system:dept", "system:role"
+            "dashboard:view", "project:manage", "project:engineering", "system:user", "system:dept", "system:role", "system:audit"
     );
 
     @Autowired

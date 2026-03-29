@@ -42,7 +42,7 @@ import java.util.regex.Pattern;
 @RequestMapping("/project")
 public class ProjectController {
 
-    private static final Pattern MAINLAND_MOBILE_PATTERN = Pattern.compile("^1\\d{10}$");
+    private static final Pattern CONTACT_PHONE_PATTERN = Pattern.compile("^[0-9-]{7,20}$");
 
     @Autowired
     private BizProjectService bizProjectService;
@@ -649,7 +649,7 @@ public class ProjectController {
 
     /**
      * 校验联系电话格式。
-     * 允许为空，非空时需符合大陆 11 位手机号格式。
+     * 允许为空，非空时需符合 7-20 位数字/短横线格式。
      *
      * @param phone 联系电话
      * @return 校验失败时返回错误提示，成功返回 null
@@ -659,8 +659,8 @@ public class ProjectController {
             return null;
         }
         String normalizedPhone = phone.trim();
-        if (!MAINLAND_MOBILE_PATTERN.matcher(normalizedPhone).matches()) {
-            return "联系电话格式不正确，请填写11位手机号";
+        if (!CONTACT_PHONE_PATTERN.matcher(normalizedPhone).matches()) {
+            return "联系电话格式不正确，请填写7到20位数字，可包含短横线";
         }
         return null;
     }

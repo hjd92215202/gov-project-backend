@@ -8,6 +8,7 @@ Stack: Spring Boot 2.7, MyBatis-Plus, Sa-Token, Flowable, MinIO, MariaDB/openGau
 ## 1) What this backend does
 - Authentication and session.
 - User/Department/Role management.
+- Audit log query for administrators.
 - Project lifecycle and approval workflow integration.
 - Approval task processing and project status write-back.
 - File upload to MinIO.
@@ -99,6 +100,9 @@ Main config files:
 - `PUT /system/role/{id}/menus`
 - `DELETE /system/role/{id}`
 
+### system audit
+- `GET /system/audit/page`
+
 ### file
 - `POST /common/upload`
 
@@ -142,6 +146,7 @@ Main config files:
 - `sys_dept` (includes `leader_id`)
 - `biz_project` (province/city/district, geo, leader info, status, creator fields)
 - `sys_file`
+- `sys_audit_log`
 
 SQL/bootstrap references:
 - `RBAC.sql`

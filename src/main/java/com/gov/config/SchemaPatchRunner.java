@@ -26,6 +26,19 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("ALTER TABLE sys_role ADD COLUMN IF NOT EXISTS menu_perms VARCHAR(1000) DEFAULT NULL COMMENT '菜单权限键集合（逗号分隔）'");
         safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_id BIGINT DEFAULT NULL COMMENT '创建人用户标识'");
         safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_dept_id BIGINT DEFAULT NULL COMMENT '创建人部门标识'");
+        safeExec("CREATE TABLE IF NOT EXISTS sys_audit_log ("
+                + "id BIGINT NOT NULL,"
+                + "user_id BIGINT DEFAULT NULL,"
+                + "request_method VARCHAR(16) DEFAULT NULL,"
+                + "request_uri VARCHAR(255) DEFAULT NULL,"
+                + "client_ip VARCHAR(64) DEFAULT NULL,"
+                + "user_agent VARCHAR(512) DEFAULT NULL,"
+                + "http_status INT DEFAULT NULL,"
+                + "duration_ms BIGINT DEFAULT NULL,"
+                + "trace_id VARCHAR(64) DEFAULT NULL,"
+                + "request_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "PRIMARY KEY (id)"
+                + ")");
 
         safeExec("CREATE INDEX idx_sys_user_username ON sys_user(username)");
         safeExec("CREATE INDEX idx_sys_user_dept_status ON sys_user(dept_id, status)");
@@ -37,6 +50,17 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("CREATE INDEX idx_biz_project_creator_status_time ON biz_project(creator_id, status, create_time)");
         safeExec("CREATE INDEX idx_biz_project_creator_dept_status_time ON biz_project(creator_dept_id, status, create_time)");
         safeExec("CREATE INDEX idx_biz_project_status_region ON biz_project(status, province, city, district)");
+        safeExec("CREATE INDEX idx_sys_audit_log_time ON sys_audit_log(request_time)");
+        safeExec("CREATE INDEX idx_sys_audit_log_user_time ON sys_audit_log(user_id, request_time)");
+        safeExec("CREATE INDEX idx_sys_audit_log_uri_time ON sys_audit_log(request_uri, request_time)");
+
+        safeExec("UPDATE sys_role SET menu_perms = "
+                + "'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit' "
+                + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
+                + "AND (menu_perms IS NULL OR menu_perms = '')");
+        safeExec("UPDATE sys_role SET menu_perms = CONCAT(menu_perms, ',system:audit') "
+                + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
+                + "AND menu_perms NOT LIKE '%system:audit%'");
     }
 
     /**
