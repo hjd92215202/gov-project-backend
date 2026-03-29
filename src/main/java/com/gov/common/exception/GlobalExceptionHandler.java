@@ -4,8 +4,12 @@ import cn.dev33.satoken.exception.NotLoginException;
 import cn.dev33.satoken.exception.NotPermissionException;
 import com.gov.common.result.R;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+
+import javax.validation.ConstraintViolationException;
 
 /**
  * 全局异常处理器。
@@ -14,6 +18,42 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    /**
+     * 处理参数校验异常（@Valid / @Validated）。
+     */
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, ConstraintViolationException.class})
+    public R<String> handleValidationException(Exception e) {
+        log.warn("参数校验失败: {}", e.getMessage());
+        if (e instanceof MethodArgumentNotValidException) {
+            MethodArgumentNotValidException ex = (MethodArgumentNotValidException) e;
+            if (ex.getBindingResult().getFieldError() != null) {
+                return R.fail(400, ex.getBindingResult().getFieldError().getDefaultMessage());
+            }
+        }
+        if (e instanceof BindException) {
+            BindException ex = (BindException) e;
+            if (ex.getBindingResult().getFieldError() != null) {
+                return R.fail(400, ex.getBindingResult().getFieldError().getDefaultMessage());
+            }
+        }
+        if (e instanceof ConstraintViolationException) {
+            ConstraintViolationException ex = (ConstraintViolationException) e;
+            if (!ex.getConstraintViolations().isEmpty()) {
+                return R.fail(400, ex.getConstraintViolations().iterator().next().getMessage());
+            }
+        }
+        return R.fail(400, "请求参数校验失败");
+    }
+
+    /**
+     * 处理业务层主动抛出的非法参数异常。
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public R<String> handleIllegalArgument(IllegalArgumentException e) {
+        log.warn("非法参数: {}", e.getMessage());
+        return R.fail(400, e.getMessage());
+    }
 
     /**
      * 兜底处理所有未显式捕获的异常。

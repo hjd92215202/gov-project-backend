@@ -25,9 +25,11 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -147,6 +149,105 @@ class ProjectControllerTest {
 
         assertEquals(Integer.valueOf(403), result.getCode());
         assertEquals("仅草稿和驳回状态项目可编辑", result.getMsg());
+    }
+
+    /**
+     * 作用：验证管理员可删除已通过状态项目，满足运维纠偏场景。
+     */
+    @Test
+    void delete_shouldAllowApprovedProjectForAdmin() {
+        BizProject dbProject = new BizProject();
+        dbProject.setId(1L);
+        dbProject.setStatus(2);
+
+        UserAccessContext context = new UserAccessContext();
+        context.setUserId(1L);
+        context.setAdmin(true);
+
+        when(bizProjectService.getById(1L)).thenReturn(dbProject);
+        when(sysUserService.getAccessContext(1L)).thenReturn(context);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+
+            R<String> result = controller.delete(1L);
+
+            assertEquals(Integer.valueOf(200), result.getCode());
+            verify(bizProjectService).removeById(1L);
+        }
+    }
+
+    /**
+     * 作用：验证联系电话格式非法时会在接口层被拦截。
+     */
+    @Test
+    void add_shouldRejectInvalidLeaderPhone() {
+        ProjectCreateDTO payload = new ProjectCreateDTO();
+        payload.setProjectName("示范项目");
+        payload.setLeaderPhone("12345");
+
+        SysUser currentUser = new SysUser();
+        currentUser.setId(100L);
+        currentUser.setDeptId(9L);
+        currentUser.setUsername("zhangsan");
+
+        UserAccessContext context = new UserAccessContext();
+        context.setUserId(100L);
+        context.setDeptId(9L);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+            when(sysUserService.getById(100L)).thenReturn(currentUser);
+            when(sysUserService.getAccessContext(100L)).thenReturn(context);
+
+            R<String> result = controller.add(payload);
+
+            assertEquals(Integer.valueOf(500), result.getCode());
+            assertEquals("联系电话格式不正确，请填写11位手机号", result.getMsg());
+            verify(bizProjectService, never()).save(any(BizProject.class));
+        }
+    }
+
+    /**
+     * 作用：验证手工填写联系电话时不会被负责人档案电话覆盖。
+     */
+    @Test
+    void add_shouldKeepManualLeaderPhoneWhenLeaderSelected() {
+        ProjectCreateDTO payload = new ProjectCreateDTO();
+        payload.setProjectName("示范项目");
+        payload.setLeaderUserId(300L);
+        payload.setLeaderPhone("13900000000");
+
+        SysUser currentUser = new SysUser();
+        currentUser.setId(1L);
+        currentUser.setDeptId(9L);
+        currentUser.setUsername("admin");
+
+        SysUser leaderUser = new SysUser();
+        leaderUser.setId(300L);
+        leaderUser.setStatus(1);
+        leaderUser.setUsername("lisi");
+        leaderUser.setRealName("李四");
+        leaderUser.setPhone("13800000000");
+
+        UserAccessContext context = new UserAccessContext();
+        context.setUserId(1L);
+        context.setDeptId(9L);
+        context.setAdmin(true);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(1L);
+            when(sysUserService.getById(1L)).thenReturn(currentUser);
+            when(sysUserService.getById(300L)).thenReturn(leaderUser);
+            when(sysUserService.getAccessContext(1L)).thenReturn(context);
+
+            R<String> result = controller.add(payload);
+
+            ArgumentCaptor<BizProject> captor = ArgumentCaptor.forClass(BizProject.class);
+            verify(bizProjectService).save(captor.capture());
+            assertEquals(Integer.valueOf(200), result.getCode());
+            assertEquals("13900000000", captor.getValue().getLeaderPhone());
+        }
     }
 
     /**

@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 /**
  * 项目管理接口控制器。
@@ -40,6 +41,8 @@ import java.util.Objects;
 @RestController
 @RequestMapping("/project")
 public class ProjectController {
+
+    private static final Pattern MAINLAND_MOBILE_PATTERN = Pattern.compile("^1\\d{10}$");
 
     @Autowired
     private BizProjectService bizProjectService;
@@ -86,6 +89,10 @@ public class ProjectController {
         String leaderError = fillLeaderByPermission(project, currentUser, accessContext);
         if (leaderError != null) {
             return R.fail(403, leaderError);
+        }
+        String phoneError = validateLeaderPhone(project.getLeaderPhone());
+        if (phoneError != null) {
+            return R.fail(phoneError);
         }
 
         bizProjectService.save(project);
@@ -243,6 +250,10 @@ public class ProjectController {
         if (leaderError != null) {
             return R.fail(403, leaderError);
         }
+        String phoneError = validateLeaderPhone(project.getLeaderPhone());
+        if (phoneError != null) {
+            return R.fail(phoneError);
+        }
 
         bizProjectService.updateById(project);
         return R.ok("项目更新成功");
@@ -261,10 +272,11 @@ public class ProjectController {
         if (dbProject == null) {
             return R.fail("项目不存在");
         }
-        if (!isEditableStatus(dbProject.getStatus())) {
-            return R.fail(403, "仅草稿和驳回状态项目可删除");
+        UserAccessContext accessContext = currentAccessContext();
+        if (!canDeleteStatus(dbProject.getStatus(), accessContext.isAdmin())) {
+            return R.fail(403, "仅草稿和驳回状态项目可删除，管理员可删除已通过项目");
         }
-        if (!canOperateProject(dbProject, currentAccessContext())) {
+        if (!canOperateProject(dbProject, accessContext)) {
             return R.fail(403, "无权限删除该项目");
         }
 
@@ -323,6 +335,10 @@ public class ProjectController {
             String leaderError = fillLeaderByPermission(createProject, currentUser, accessContext);
             if (leaderError != null) {
                 return R.fail(403, leaderError);
+            }
+            String phoneError = validateLeaderPhone(createProject.getLeaderPhone());
+            if (phoneError != null) {
+                return R.fail(phoneError);
             }
             createProject.setStatus(1);
             bizProjectService.save(createProject);
@@ -472,13 +488,19 @@ public class ProjectController {
             }
 
             project.setLeaderName(StrUtil.isNotBlank(leaderUser.getRealName()) ? leaderUser.getRealName() : leaderUser.getUsername());
-            project.setLeaderPhone(leaderUser.getPhone());
+            if (StrUtil.isBlank(project.getLeaderPhone()) && StrUtil.isNotBlank(leaderUser.getPhone())) {
+                project.setLeaderPhone(leaderUser.getPhone());
+            }
             return null;
         }
 
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
-            project.setLeaderName(StrUtil.isNotBlank(currentUser.getRealName()) ? currentUser.getRealName() : currentUser.getUsername());
-            project.setLeaderPhone(currentUser.getPhone());
+            if (StrUtil.isBlank(project.getLeaderName())) {
+                project.setLeaderName(StrUtil.isNotBlank(currentUser.getRealName()) ? currentUser.getRealName() : currentUser.getUsername());
+            }
+            if (StrUtil.isBlank(project.getLeaderPhone()) && StrUtil.isNotBlank(currentUser.getPhone())) {
+                project.setLeaderPhone(currentUser.getPhone());
+            }
         }
         return null;
     }
@@ -608,6 +630,39 @@ public class ProjectController {
      */
     private boolean isEditableStatus(Integer status) {
         return status == null || Objects.equals(status, 0) || Objects.equals(status, 3);
+    }
+
+    /**
+     * 判断项目是否允许删除。
+     * 管理员在可编辑状态基础上，额外允许删除已通过状态。
+     *
+     * @param status 项目状态
+     * @param isAdmin 当前用户是否管理员
+     * @return 是否允许删除
+     */
+    private boolean canDeleteStatus(Integer status, boolean isAdmin) {
+        if (isEditableStatus(status)) {
+            return true;
+        }
+        return isAdmin && Objects.equals(status, 2);
+    }
+
+    /**
+     * 校验联系电话格式。
+     * 允许为空，非空时需符合大陆 11 位手机号格式。
+     *
+     * @param phone 联系电话
+     * @return 校验失败时返回错误提示，成功返回 null
+     */
+    private String validateLeaderPhone(String phone) {
+        if (StrUtil.isBlank(phone)) {
+            return null;
+        }
+        String normalizedPhone = phone.trim();
+        if (!MAINLAND_MOBILE_PATTERN.matcher(normalizedPhone).matches()) {
+            return "联系电话格式不正确，请填写11位手机号";
+        }
+        return null;
     }
 
     /**

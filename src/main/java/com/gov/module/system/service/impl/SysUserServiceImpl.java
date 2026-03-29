@@ -2,9 +2,9 @@ package com.gov.module.system.service.impl;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.SmUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gov.crypto.PasswordCrypto;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysRole;
 import com.gov.module.system.entity.SysUser;
@@ -73,9 +73,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new RuntimeException("账号已停用");
         }
 
-        String salt = user.getUsername().trim();
-        String encryptPassword = SmUtil.sm3(password.trim() + salt);
-        if (!encryptPassword.equals(user.getPassword())) {
+        if (!PasswordCrypto.matches(password, user.getUsername(), user.getPassword())) {
             throw new RuntimeException("用户名或密码错误");
         }
 

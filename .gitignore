@@ -39,3 +39,7 @@ build/
 /repomix-output.xml
 /.repomixignore
 /.idea/inspectionProfiles/Project_Default.xml
+logs/
+.env
+.env.*
+!.env.example

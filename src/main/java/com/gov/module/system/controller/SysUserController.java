@@ -2,11 +2,11 @@ package com.gov.module.system.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.crypto.SmUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
+import com.gov.crypto.PasswordCrypto;
 import com.gov.module.system.dto.UserCreateDTO;
 import com.gov.module.system.dto.UserRoleAssignDTO;
 import com.gov.module.system.dto.UserStatusUpdateDTO;
@@ -182,7 +182,7 @@ public class SysUserController {
 
         String rawPassword = StrUtil.isBlank(user.getPassword()) ? "123456" : user.getPassword().trim();
         user.setUsername(username);
-        user.setPassword(SmUtil.sm3(rawPassword + username));
+        user.setPassword(PasswordCrypto.encode(rawPassword, username));
         if (user.getStatus() == null) {
             user.setStatus(1);
         }
@@ -244,7 +244,7 @@ public class SysUserController {
             updateEntity.setStatus(user.getStatus());
         }
         if (StrUtil.isNotBlank(user.getPassword())) {
-            updateEntity.setPassword(SmUtil.sm3(user.getPassword().trim() + dbUser.getUsername().trim()));
+            updateEntity.setPassword(PasswordCrypto.encode(user.getPassword(), dbUser.getUsername()));
         }
 
         sysUserService.updateById(updateEntity);

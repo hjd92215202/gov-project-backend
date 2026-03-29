@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.gov.crypto.SmTypeHandler;
 import lombok.Data;
 
 import java.io.Serializable;
@@ -18,7 +19,7 @@ import java.util.List;
  * 它是数据库模型，不直接等同于接口层的 DTO 或 VO。
  */
 @Data
-@TableName("sys_user")
+@TableName(value = "sys_user", autoResultMap = true)
 public class SysUser implements Serializable {
     private static final long serialVersionUID = 1L;
 
@@ -35,6 +36,7 @@ public class SysUser implements Serializable {
     /** 真实姓名。 */
     private String realName;
     /** 联系电话。 */
+    @TableField(typeHandler = SmTypeHandler.class)
     private String phone;
     /** 状态：1启用，0停用。 */
     private Integer status;

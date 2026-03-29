@@ -35,7 +35,7 @@ mybatis-plus:
       logic-not-delete-value: 0
   configuration:
     map-underscore-to-camel-case: true # 开启驼峰命名转换
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl # 开发时打印SQL
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl # 避免在日志中输出敏感SQL参数
 
 # Sa-Token 权限配置
 sa-token:
@@ -56,3 +56,26 @@ minio:
 flowable:
   database-schema-update: true # 自动建表 (极其重要，启动时会自动在库里建 flowable 的 34 张表)
   async-executor-activate: false # 如果没有定时任务节点，可以关掉节省资源
+
+# 应用日志配置
+logging:
+  config: classpath:logback-spring.xml
+  file:
+    path: ./logs
+  level:
+    root: INFO
+    com.gov.audit: INFO
+
+# 政务项目统一安全配置
+gov:
+  security:
+    sm4:
+      key: ${GOV_SM4_KEY:1234567812345678}
+      enabled: ${GOV_SM4_ENABLED:true}
+      allow-plaintext-fallback: ${GOV_SM4_ALLOW_PLAINTEXT_FALLBACK:true}
+    password:
+      pepper: ${GOV_PASSWORD_PEPPER:}
+  logging:
+    max-history-days: 30
+    max-file-size: 20MB
+    total-size-cap: 2GB
