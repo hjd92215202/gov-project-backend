@@ -20,6 +20,8 @@ public class AuditLogPageVO {
     private String username;
     /** 真实姓名。 */
     private String realName;
+    /** User department name. */
+    private String deptName;
     /** HTTP 方法。 */
     private String requestMethod;
     /** 请求路径。 */

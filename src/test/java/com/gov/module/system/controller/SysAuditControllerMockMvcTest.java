@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.module.system.entity.SysAuditLog;
 import com.gov.module.system.service.SysAuditLogService;
+import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.UserAccessContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,7 @@ class SysAuditControllerMockMvcTest {
 
     private final SysAuditLogService sysAuditLogService = mock(SysAuditLogService.class);
     private final SysUserService sysUserService = mock(SysUserService.class);
+    private final SysDeptService sysDeptService = mock(SysDeptService.class);
     private MockMvc mockMvc;
 
     @BeforeEach
@@ -42,6 +44,7 @@ class SysAuditControllerMockMvcTest {
         SysAuditController controller = new SysAuditController();
         ReflectionTestUtils.setField(controller, "sysAuditLogService", sysAuditLogService);
         ReflectionTestUtils.setField(controller, "sysUserService", sysUserService);
+        ReflectionTestUtils.setField(controller, "sysDeptService", sysDeptService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
@@ -98,6 +101,7 @@ class SysAuditControllerMockMvcTest {
                     .andExpect(jsonPath("$.data.records[0].id").value(9))
                     .andExpect(jsonPath("$.data.records[0].userId").isEmpty())
                     .andExpect(jsonPath("$.data.records[0].username").isEmpty())
+                    .andExpect(jsonPath("$.data.records[0].deptName").isEmpty())
                     .andExpect(jsonPath("$.data.records[0].requestMethod").value("POST"));
         }
     }

@@ -7,7 +7,9 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
 import com.gov.module.system.entity.SysAuditLog;
+import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
+import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysAuditLogService;
 import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.AuditLogPageVO;
@@ -25,6 +27,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +51,9 @@ public class SysAuditController {
     @Autowired
     private SysUserService sysUserService;
 
+    @Autowired
+    private SysDeptService sysDeptService;
+
     /**
      * 分页查询审计日志（仅超级管理员可访问）。
      *
@@ -55,10 +61,12 @@ public class SysAuditController {
      * @param pageSize 每页条数
      * @param userId 用户 ID
      * @param keyword 用户关键字（用户名/真实姓名）
+     * @param deptName 用户部门关键字
      * @param requestMethod HTTP 方法
      * @param requestUri 请求路径关键字
-     * @param httpStatus HTTP 状态码
      * @param clientIp 客户端 IP 关键字
+     * @param durationMin 最小耗时（毫秒）
+     * @param durationMax 最大耗时（毫秒）
      * @param startTime 开始时间
      * @param endTime 结束时间
      * @return 审计日志分页结果
@@ -70,10 +78,12 @@ public class SysAuditController {
             @RequestParam(defaultValue = "20") Integer pageSize,
             @RequestParam(required = false) Long userId,
             @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String deptName,
             @RequestParam(required = false) String requestMethod,
             @RequestParam(required = false) String requestUri,
-            @RequestParam(required = false) Integer httpStatus,
             @RequestParam(required = false) String clientIp,
+            @RequestParam(required = false) Long durationMin,
+            @RequestParam(required = false) Long durationMax,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date endTime
     ) {
@@ -87,13 +97,14 @@ public class SysAuditController {
         wrapper.eq(StrUtil.isNotBlank(requestMethod), SysAuditLog::getRequestMethod,
                 requestMethod == null ? null : requestMethod.trim().toUpperCase());
         wrapper.like(StrUtil.isNotBlank(requestUri), SysAuditLog::getRequestUri, requestUri == null ? null : requestUri.trim());
-        wrapper.eq(httpStatus != null, SysAuditLog::getHttpStatus, httpStatus);
         wrapper.like(StrUtil.isNotBlank(clientIp), SysAuditLog::getClientIp, clientIp == null ? null : clientIp.trim());
+        wrapper.ge(durationMin != null, SysAuditLog::getDurationMs, durationMin);
+        wrapper.le(durationMax != null, SysAuditLog::getDurationMs, durationMax);
         wrapper.ge(startTime != null, SysAuditLog::getRequestTime, startTime);
         wrapper.le(endTime != null, SysAuditLog::getRequestTime, endTime);
 
-        if (StrUtil.isNotBlank(keyword)) {
-            List<Long> matchedUserIds = loadUserIdsByKeyword(keyword.trim());
+        Set<Long> matchedUserIds = loadUserIdsByKeywordAndDept(keyword, deptName);
+        if (matchedUserIds != null) {
             if (matchedUserIds.isEmpty()) {
                 return R.ok(buildPageResult(pageNum, pageSize, 0L, Collections.emptyList()));
             }
@@ -128,6 +139,53 @@ public class SysAuditController {
                 .collect(Collectors.toList());
     }
 
+    private List<Long> loadUserIdsByDeptName(String deptName) {
+        if (StrUtil.isBlank(deptName)) {
+            return Collections.emptyList();
+        }
+        List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>()
+                .select(SysDept::getId)
+                .like(SysDept::getDeptName, deptName));
+        Set<Long> deptIds = deptList.stream()
+                .map(SysDept::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (deptIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<SysUser> users = sysUserService.list(new LambdaQueryWrapper<SysUser>()
+                .select(SysUser::getId)
+                .in(SysUser::getDeptId, deptIds));
+        return users.stream()
+                .map(SysUser::getId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
+    private Set<Long> loadUserIdsByKeywordAndDept(String keyword, String deptName) {
+        boolean hasKeyword = StrUtil.isNotBlank(keyword);
+        boolean hasDeptName = StrUtil.isNotBlank(deptName);
+        if (!hasKeyword && !hasDeptName) {
+            return null;
+        }
+
+        Set<Long> matchedByKeyword = null;
+        Set<Long> matchedByDept = null;
+        if (hasKeyword) {
+            matchedByKeyword = new LinkedHashSet<>(loadUserIdsByKeyword(keyword.trim()));
+        }
+        if (hasDeptName) {
+            matchedByDept = new LinkedHashSet<>(loadUserIdsByDeptName(deptName.trim()));
+        }
+
+        if (matchedByKeyword == null) return matchedByDept;
+        if (matchedByDept == null) return matchedByKeyword;
+        matchedByKeyword.retainAll(matchedByDept);
+        return matchedByKeyword;
+    }
+
     private List<AuditLogPageVO> toAuditLogVO(List<SysAuditLog> records) {
         if (records == null || records.isEmpty()) {
             return Collections.emptyList();
@@ -139,11 +197,25 @@ public class SysAuditController {
         Map<Long, SysUser> userMap = new HashMap<>();
         if (!userIds.isEmpty()) {
             List<SysUser> users = sysUserService.list(new LambdaQueryWrapper<SysUser>()
-                    .select(SysUser::getId, SysUser::getUsername, SysUser::getRealName)
+                    .select(SysUser::getId, SysUser::getUsername, SysUser::getRealName, SysUser::getDeptId)
                     .in(SysUser::getId, userIds));
             for (SysUser user : users) {
                 if (user != null && user.getId() != null) {
                     userMap.put(user.getId(), user);
+                }
+            }
+        }
+
+        Set<Long> deptIds = userMap.values().stream()
+                .map(SysUser::getDeptId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> deptNameMap = new HashMap<>();
+        if (!deptIds.isEmpty()) {
+            List<SysDept> deptList = sysDeptService.listByIds(deptIds);
+            for (SysDept dept : deptList) {
+                if (dept != null && dept.getId() != null) {
+                    deptNameMap.put(dept.getId(), dept.getDeptName());
                 }
             }
         }
@@ -156,6 +228,7 @@ public class SysAuditController {
             SysUser user = item.getUserId() == null ? null : userMap.get(item.getUserId());
             vo.setUsername(user == null ? null : user.getUsername());
             vo.setRealName(user == null ? null : user.getRealName());
+            vo.setDeptName(user == null ? null : deptNameMap.get(user.getDeptId()));
             vo.setRequestMethod(item.getRequestMethod());
             vo.setRequestUri(item.getRequestUri());
             vo.setClientIp(item.getClientIp());
