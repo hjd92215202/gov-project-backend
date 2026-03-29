@@ -17,7 +17,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.Arrays;
 import java.util.Collection;
@@ -59,6 +62,7 @@ class SysUserServiceImplTest {
         ReflectionTestUtils.setField(service, "sysUserRoleMapper", sysUserRoleMapper);
         ReflectionTestUtils.setField(service, "sysRoleMapper", sysRoleMapper);
         ReflectionTestUtils.setField(service, "sysDeptService", sysDeptService);
+        RequestContextHolder.resetRequestAttributes();
         service.userById = null;
         service.singleUser = null;
         service.roleIdsMap = Collections.emptyMap();
@@ -108,6 +112,34 @@ class SysUserServiceImplTest {
 
         assertTrue(context.isDeptLeader());
         assertIterableEquals(Arrays.asList("project:engineering", "system:user"), context.getMenuKeys());
+    }
+
+    /**
+     * 作用：验证同一请求内重复读取访问上下文时，会直接复用缓存，避免重复查角色和部门负责人关系。
+     */
+    @Test
+    void getAccessContext_shouldReuseRequestScopedCache() {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        RequestContextHolder.setRequestAttributes(new ServletRequestAttributes(request));
+
+        SysUser user = new SysUser();
+        user.setId(6L);
+        user.setDeptId(60L);
+
+        SysRole role = new SysRole();
+        role.setId(12L);
+        role.setRoleCode("dept_leader");
+        role.setMenuPerms("project:engineering,system:user");
+
+        service.userById = user;
+        service.roleIdsMap = Collections.singletonMap(6L, Collections.singletonList(12L));
+        when(sysRoleMapper.selectBatchIds(Collections.singletonList(12L))).thenReturn(Collections.singletonList(role));
+
+        UserAccessContext first = service.getAccessContext(6L);
+        UserAccessContext second = service.getAccessContext(6L);
+
+        assertEquals(first, second);
+        verify(sysRoleMapper, times(1)).selectBatchIds(Collections.singletonList(12L));
     }
 
     /**

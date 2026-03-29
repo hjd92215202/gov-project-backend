@@ -7,6 +7,7 @@ GRANT SHOW DATABASES, REFERENCES ON *.* TO 'db_user'@'%';
 FLUSH PRIVILEGES;
 
 DROP TABLE IF EXISTS sys_audit_log;
+DROP TABLE IF EXISTS sys_frontend_log;
 DROP TABLE IF EXISTS sys_file;
 DROP TABLE IF EXISTS biz_project;
 DROP TABLE IF EXISTS sys_user_role;
@@ -104,6 +105,22 @@ CREATE TABLE sys_audit_log (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统审计日志表';
 
+CREATE TABLE sys_frontend_log (
+    id BIGINT NOT NULL COMMENT '主键',
+    user_id BIGINT DEFAULT NULL COMMENT '操作用户ID',
+    log_level VARCHAR(16) DEFAULT NULL COMMENT '日志级别',
+    log_type VARCHAR(32) DEFAULT NULL COMMENT '日志类型',
+    event_name VARCHAR(64) DEFAULT NULL COMMENT '事件名称',
+    message VARCHAR(255) DEFAULT NULL COMMENT '核心消息',
+    page_path VARCHAR(255) DEFAULT NULL COMMENT '页面路径',
+    trace_id VARCHAR(64) DEFAULT NULL COMMENT '链路追踪ID',
+    detail_json TEXT DEFAULT NULL COMMENT '扩展细节JSON',
+    client_ip VARCHAR(64) DEFAULT NULL COMMENT '客户端IP',
+    user_agent VARCHAR(512) DEFAULT NULL COMMENT '浏览器标识',
+    created_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '上报时间',
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='前端运行监控日志表';
+
 CREATE INDEX idx_sys_dept_parent_id ON sys_dept(parent_id);
 CREATE INDEX idx_sys_dept_leader_id ON sys_dept(leader_id);
 CREATE INDEX idx_sys_role_role_code ON sys_role(role_code);
@@ -117,9 +134,15 @@ CREATE INDEX idx_biz_project_status_region ON biz_project(status, province, city
 CREATE INDEX idx_sys_audit_log_time ON sys_audit_log(request_time);
 CREATE INDEX idx_sys_audit_log_user_time ON sys_audit_log(user_id, request_time);
 CREATE INDEX idx_sys_audit_log_uri_time ON sys_audit_log(request_uri, request_time);
+CREATE INDEX idx_sys_audit_log_method_time ON sys_audit_log(request_method, request_time);
+CREATE INDEX idx_sys_frontend_log_time ON sys_frontend_log(created_time);
+CREATE INDEX idx_sys_frontend_log_user_time ON sys_frontend_log(user_id, created_time);
+CREATE INDEX idx_sys_frontend_log_level_time ON sys_frontend_log(log_level, created_time);
+CREATE INDEX idx_sys_frontend_log_type_time ON sys_frontend_log(log_type, created_time);
+CREATE INDEX idx_sys_frontend_log_trace_id ON sys_frontend_log(trace_id);
 
 INSERT INTO sys_role (id, role_name, role_code, menu_perms)
-VALUES (1, '系统管理员', 'admin', 'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit');
+VALUES (1, '系统管理员', 'admin', 'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit,system:frontend-monitor');
 
 INSERT INTO sys_dept (id, parent_id, dept_name)
 VALUES (1, 0, '综合部门');

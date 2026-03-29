@@ -22,6 +22,8 @@ import com.gov.module.system.vo.UserPageVO;
 import com.gov.module.system.vo.UserSimpleVO;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -47,6 +49,7 @@ import java.util.stream.Collectors;
 @RequestMapping("/system/user")
 public class SysUserController {
 
+    private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
     private static final String PHONE_REGEX = "^[0-9-]{7,20}$";
 
     @Autowired
@@ -79,6 +82,7 @@ public class SysUserController {
             @RequestParam(required = false) Integer status,
             @RequestParam(required = false) Long deptId
     ) {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
             return R.fail(403, "无权限查看用户列表");
@@ -111,6 +115,8 @@ public class SysUserController {
             records.add(toUserPageVO(user));
         }
         responsePage.setRecords(records);
+        perfLog.info("用户分页查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), pageNum, pageSize, page.getTotal(), records.size(), System.currentTimeMillis() - startAt);
         return R.ok(responsePage);
     }
 
@@ -123,6 +129,7 @@ public class SysUserController {
     @ApiOperation("简版用户列表")
     @GetMapping("/simple")
     public R<List<UserSimpleVO>> simple() {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
 
         LambdaQueryWrapper<SysUser> wrapper = new LambdaQueryWrapper<>();
@@ -145,6 +152,8 @@ public class SysUserController {
         for (SysUser user : sysUserService.list(wrapper)) {
             result.add(toUserSimpleVO(user));
         }
+        perfLog.info("简版用户列表查询完成 userId={} count={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), result.size(), System.currentTimeMillis() - startAt);
         return R.ok(result);
     }
 
@@ -157,6 +166,7 @@ public class SysUserController {
     @ApiOperation("新增用户")
     @PostMapping("/add")
     public R<Map<String, Object>> add(@RequestBody UserCreateDTO payload) {
+        long startAt = System.currentTimeMillis();
         SysUser user = toCreateUserEntity(payload);
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
@@ -201,6 +211,8 @@ public class SysUserController {
 
         Map<String, Object> data = new HashMap<>();
         data.put("userId", user.getId());
+        perfLog.info("action=userAdd operatorUserId={} targetUserId={} deptId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), user.getId(), user.getDeptId(), System.currentTimeMillis() - startAt);
         return R.ok(data, "用户创建成功");
     }
 
@@ -213,6 +225,7 @@ public class SysUserController {
     @ApiOperation("更新用户")
     @PutMapping("/update")
     public R<String> update(@RequestBody UserUpdateDTO payload) {
+        long startAt = System.currentTimeMillis();
         SysUser user = toUpdateUserEntity(payload);
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
@@ -263,6 +276,8 @@ public class SysUserController {
         if (accessContext.isAdmin() && user.getRoleIds() != null) {
             sysUserService.assignRoles(user.getId(), user.getRoleIds());
         }
+        perfLog.info("action=userUpdate operatorUserId={} targetUserId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), user.getId(), System.currentTimeMillis() - startAt);
         return R.ok("用户更新成功");
     }
 
@@ -275,6 +290,7 @@ public class SysUserController {
     @ApiOperation("更新用户状态")
     @PutMapping("/status")
     public R<String> updateStatus(@RequestBody UserStatusUpdateDTO payload) {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
             return R.fail(403, "无权限修改用户状态");
@@ -301,6 +317,8 @@ public class SysUserController {
         updateEntity.setId(id);
         updateEntity.setStatus(status);
         sysUserService.updateById(updateEntity);
+        perfLog.info("action=userStatusUpdate operatorUserId={} targetUserId={} status={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), id, status, System.currentTimeMillis() - startAt);
         return R.ok("用户状态更新成功");
     }
 
@@ -313,6 +331,7 @@ public class SysUserController {
     @ApiOperation("获取用户角色ID")
     @GetMapping("/{id}/roles")
     public R<List<Long>> getUserRoles(@PathVariable Long id) {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
             return R.fail(403, "无权限查看用户角色");
@@ -329,7 +348,10 @@ public class SysUserController {
             }
         }
 
-        return R.ok(sysUserService.getRoleIds(id));
+        List<Long> roleIds = sysUserService.getRoleIds(id);
+        perfLog.info("用户角色查询完成 operatorUserId={} targetUserId={} count={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), id, roleIds.size(), System.currentTimeMillis() - startAt);
+        return R.ok(roleIds);
     }
 
     /**
@@ -341,6 +363,7 @@ public class SysUserController {
     @ApiOperation("设置用户角色")
     @PutMapping("/roles")
     public R<String> setUserRoles(@RequestBody UserRoleAssignDTO payload) {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin()) {
             return R.fail(403, "仅管理员可分配用户角色");
@@ -361,6 +384,8 @@ public class SysUserController {
         }
 
         sysUserService.assignRoles(userId, roleIds);
+        perfLog.info("action=userRolesUpdate operatorUserId={} targetUserId={} roleCount={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), userId, roleIds.size(), System.currentTimeMillis() - startAt);
         return R.ok("角色设置成功");
     }
 

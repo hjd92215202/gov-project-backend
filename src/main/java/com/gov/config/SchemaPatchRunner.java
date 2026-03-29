@@ -39,6 +39,21 @@ public class SchemaPatchRunner implements CommandLineRunner {
                 + "request_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
                 + "PRIMARY KEY (id)"
                 + ")");
+        safeExec("CREATE TABLE IF NOT EXISTS sys_frontend_log ("
+                + "id BIGINT NOT NULL,"
+                + "user_id BIGINT DEFAULT NULL,"
+                + "log_level VARCHAR(16) DEFAULT NULL,"
+                + "log_type VARCHAR(32) DEFAULT NULL,"
+                + "event_name VARCHAR(64) DEFAULT NULL,"
+                + "message VARCHAR(255) DEFAULT NULL,"
+                + "page_path VARCHAR(255) DEFAULT NULL,"
+                + "trace_id VARCHAR(64) DEFAULT NULL,"
+                + "detail_json TEXT DEFAULT NULL,"
+                + "client_ip VARCHAR(64) DEFAULT NULL,"
+                + "user_agent VARCHAR(512) DEFAULT NULL,"
+                + "created_time DATETIME DEFAULT CURRENT_TIMESTAMP,"
+                + "PRIMARY KEY (id)"
+                + ")");
 
         safeExec("ALTER TABLE sys_user MODIFY phone VARCHAR(255) DEFAULT NULL COMMENT '手机号（数据库中为密文）'");
         safeExec("CREATE INDEX idx_sys_user_username ON sys_user(username)");
@@ -54,14 +69,23 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("CREATE INDEX idx_sys_audit_log_time ON sys_audit_log(request_time)");
         safeExec("CREATE INDEX idx_sys_audit_log_user_time ON sys_audit_log(user_id, request_time)");
         safeExec("CREATE INDEX idx_sys_audit_log_uri_time ON sys_audit_log(request_uri, request_time)");
+        safeExec("CREATE INDEX idx_sys_audit_log_method_time ON sys_audit_log(request_method, request_time)");
+        safeExec("CREATE INDEX idx_sys_frontend_log_time ON sys_frontend_log(created_time)");
+        safeExec("CREATE INDEX idx_sys_frontend_log_user_time ON sys_frontend_log(user_id, created_time)");
+        safeExec("CREATE INDEX idx_sys_frontend_log_level_time ON sys_frontend_log(log_level, created_time)");
+        safeExec("CREATE INDEX idx_sys_frontend_log_type_time ON sys_frontend_log(log_type, created_time)");
+        safeExec("CREATE INDEX idx_sys_frontend_log_trace_id ON sys_frontend_log(trace_id)");
 
         safeExec("UPDATE sys_role SET menu_perms = "
-                + "'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit' "
+                + "'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit,system:frontend-monitor' "
                 + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
                 + "AND (menu_perms IS NULL OR menu_perms = '')");
         safeExec("UPDATE sys_role SET menu_perms = CONCAT(menu_perms, ',system:audit') "
                 + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
                 + "AND menu_perms NOT LIKE '%system:audit%'");
+        safeExec("UPDATE sys_role SET menu_perms = CONCAT(menu_perms, ',system:frontend-monitor') "
+                + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
+                + "AND menu_perms NOT LIKE '%system:frontend-monitor%'");
     }
 
     /**

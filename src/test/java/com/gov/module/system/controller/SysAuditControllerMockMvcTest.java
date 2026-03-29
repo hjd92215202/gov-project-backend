@@ -76,15 +76,11 @@ class SysAuditControllerMockMvcTest {
         when(sysUserService.getAccessContext(1L)).thenReturn(accessContext);
 
         SysAuditLog log = new SysAuditLog();
-        log.setId(9L);
         log.setUserId(null);
         log.setRequestMethod("POST");
         log.setRequestUri("/api/flow/approve");
         log.setClientIp("10.10.10.10");
-        log.setHttpStatus(200);
         log.setDurationMs(120L);
-        log.setTraceId("trace-demo");
-        log.setUserAgent("JUnit-Agent");
         log.setRequestTime(new Date());
 
         IPage<SysAuditLog> page = new Page<>(1, 20, 1);
@@ -98,11 +94,13 @@ class SysAuditControllerMockMvcTest {
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
                     .andExpect(jsonPath("$.data.total").value(1))
-                    .andExpect(jsonPath("$.data.records[0].id").value(9))
                     .andExpect(jsonPath("$.data.records[0].userId").isEmpty())
                     .andExpect(jsonPath("$.data.records[0].username").isEmpty())
                     .andExpect(jsonPath("$.data.records[0].deptName").isEmpty())
-                    .andExpect(jsonPath("$.data.records[0].requestMethod").value("POST"));
+                    .andExpect(jsonPath("$.data.records[0].requestMethod").value("POST"))
+                    .andExpect(jsonPath("$.data.records[0].requestUri").value("/api/flow/approve"))
+                    .andExpect(jsonPath("$.data.records[0].clientIp").value("10.10.10.10"))
+                    .andExpect(jsonPath("$.data.records[0].durationMs").value(120));
         }
     }
 

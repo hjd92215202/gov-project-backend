@@ -11,6 +11,8 @@ import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysUserService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.flowable.engine.HistoryService;
 import org.flowable.engine.RuntimeService;
 import org.flowable.engine.TaskService;
@@ -39,6 +41,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class FlowService {
+
+    private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
 
     @Autowired
     private RuntimeService runtimeService;
@@ -77,6 +81,7 @@ public class FlowService {
      * @return 待办任务分页
      */
     public IPage<FlowTaskVO> getTodoPage(Integer pageNum, Integer pageSize) {
+        long startAt = System.currentTimeMillis();
         String userId = StpUtil.getLoginIdAsString();
         long total = taskService.createTaskQuery().taskAssignee(userId).count();
         int current = normalizePageNum(pageNum);
@@ -111,7 +116,10 @@ public class FlowService {
             records.add(vo);
         }
 
-        return buildPage(current, size, total, records);
+        IPage<FlowTaskVO> page = buildPage(current, size, total, records);
+        perfLog.info("审批待办查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
+                userId, current, size, total, records.size(), System.currentTimeMillis() - startAt);
+        return page;
     }
 
     /**
@@ -122,6 +130,7 @@ public class FlowService {
      * @return 已办任务分页
      */
     public IPage<FlowTaskVO> getDonePage(Integer pageNum, Integer pageSize) {
+        long startAt = System.currentTimeMillis();
         String userId = StpUtil.getLoginIdAsString();
         long total = historyService.createHistoricTaskInstanceQuery()
                 .taskAssignee(userId)
@@ -165,7 +174,10 @@ public class FlowService {
             records.add(vo);
         }
 
-        return buildPage(current, size, total, records);
+        IPage<FlowTaskVO> page = buildPage(current, size, total, records);
+        perfLog.info("审批已办查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
+                userId, current, size, total, records.size(), System.currentTimeMillis() - startAt);
+        return page;
     }
 
     /**
@@ -178,9 +190,14 @@ public class FlowService {
      */
     @Transactional
     public void approve(String taskId, boolean approved) {
+        long startAt = System.currentTimeMillis();
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         if (task == null) {
             throw new RuntimeException("审批任务不存在");
+        }
+        String currentLoginId = StpUtil.getLoginIdAsString();
+        if (task.getAssignee() == null || !Objects.equals(task.getAssignee(), currentLoginId)) {
+            throw new RuntimeException("当前任务不属于当前登录用户");
         }
 
         String processInstanceId = task.getProcessInstanceId();
@@ -194,6 +211,8 @@ public class FlowService {
             vars.put("approved", false);
             taskService.complete(taskId, vars);
             updateProjectStatus(businessKey, 3);
+            perfLog.info("审批任务处理完成 userId={} taskId={} approved=false businessKey={} durationMs={}",
+                    currentLoginId, taskId, businessKey, System.currentTimeMillis() - startAt);
             return;
         }
 
@@ -227,6 +246,8 @@ public class FlowService {
         }
 
         taskService.complete(taskId, vars);
+        perfLog.info("审批任务处理完成 userId={} taskId={} approved=true businessKey={} durationMs={}",
+                currentLoginId, taskId, businessKey, System.currentTimeMillis() - startAt);
     }
 
     /**

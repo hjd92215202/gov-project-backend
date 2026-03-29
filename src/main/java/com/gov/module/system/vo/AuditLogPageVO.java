@@ -12,15 +12,13 @@ import java.util.Date;
  */
 @Data
 public class AuditLogPageVO {
-    /** 审计日志主键。 */
-    private Long id;
     /** 操作用户 ID。 */
     private Long userId;
     /** 用户名。 */
     private String username;
     /** 真实姓名。 */
     private String realName;
-    /** User department name. */
+    /** 用户部门名称。 */
     private String deptName;
     /** HTTP 方法。 */
     private String requestMethod;
@@ -28,14 +26,8 @@ public class AuditLogPageVO {
     private String requestUri;
     /** 客户端 IP。 */
     private String clientIp;
-    /** HTTP 状态码。 */
-    private Integer httpStatus;
     /** 请求耗时（毫秒）。 */
     private Long durationMs;
-    /** 链路追踪 ID。 */
-    private String traceId;
-    /** 用户代理。 */
-    private String userAgent;
     /** 请求时间。 */
     private Date requestTime;
 }

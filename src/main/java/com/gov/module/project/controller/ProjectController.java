@@ -22,6 +22,8 @@ import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.UserAccessContext;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -42,6 +44,7 @@ import java.util.regex.Pattern;
 @RequestMapping("/project")
 public class ProjectController {
 
+    private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
     private static final Pattern CONTACT_PHONE_PATTERN = Pattern.compile("^[0-9-]{7,20}$");
 
     @Autowired
@@ -123,6 +126,7 @@ public class ProjectController {
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String district
     ) {
+        long startAt = System.currentTimeMillis();
         LambdaQueryWrapper<BizProject> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.select(
                 BizProject::getId,
@@ -175,6 +179,8 @@ public class ProjectController {
             records.add(vo);
         }
         responsePage.setRecords(records);
+        perfLog.info("项目分页查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), pageNum, pageSize, result.getTotal(), records.size(), System.currentTimeMillis() - startAt);
         return R.ok(responsePage);
     }
 
@@ -187,6 +193,7 @@ public class ProjectController {
     @ApiOperation("项目详情")
     @GetMapping("/get/{id}")
     public R<ProjectDetailVO> get(@PathVariable Long id) {
+        long startAt = System.currentTimeMillis();
         BizProject project = bizProjectService.getById(id);
         if (project == null) {
             return R.fail("项目不存在");
@@ -194,6 +201,8 @@ public class ProjectController {
         if (!canOperateProject(project, currentAccessContext())) {
             return R.fail(403, "无权限查看该项目");
         }
+        perfLog.info("项目详情查询完成 userId={} projectId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), id, System.currentTimeMillis() - startAt);
         return R.ok(toProjectDetailVO(project));
     }
 
@@ -294,6 +303,7 @@ public class ProjectController {
     @ApiOperation("提交项目审批")
     @PostMapping("/submit")
     public R<String> submit(@RequestBody ProjectSubmitDTO payload) {
+        long startAt = System.currentTimeMillis();
         Long currentUserId = StpUtil.getLoginIdAsLong();
         SysUser currentUser = sysUserService.getById(currentUserId);
         if (currentUser == null) {
@@ -360,6 +370,8 @@ public class ProjectController {
         Map<String, Object> vars = new HashMap<>();
         vars.put("currentAssignee", dept.getLeaderId().toString());
         flowService.startProcess(String.valueOf(projectId), vars);
+        perfLog.info("项目提交审批完成 userId={} projectId={} mode={} durationMs={}",
+                currentUserId, projectId, payload.getId() != null ? "existing" : "create_and_submit", System.currentTimeMillis() - startAt);
         return R.ok("提交审批成功");
     }
 
@@ -379,6 +391,7 @@ public class ProjectController {
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String district
     ) {
+        long startAt = System.currentTimeMillis();
         LambdaQueryWrapper<BizProject> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.select(
                 BizProject::getId,
@@ -412,6 +425,8 @@ public class ProjectController {
             vo.setDistrict(item.getDistrict());
             result.add(vo);
         }
+        perfLog.info("项目地图点位查询完成 userId={} province={} city={} district={} count={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), province, city, district, result.size(), System.currentTimeMillis() - startAt);
         return R.ok(result);
     }
 

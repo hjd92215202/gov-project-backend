@@ -3,6 +3,7 @@ package com.gov.module.system.controller;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
@@ -16,6 +17,8 @@ import com.gov.module.system.vo.AuditLogPageVO;
 import com.gov.module.system.vo.UserAccessContext;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +47,8 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/system/audit")
 public class SysAuditController {
+
+    private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
 
     @Autowired
     private SysAuditLogService sysAuditLogService;
@@ -87,31 +92,33 @@ public class SysAuditController {
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date startTime,
             @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date endTime
     ) {
+        long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = sysUserService.getAccessContext(StpUtil.getLoginIdAsLong());
         if (!accessContext.isAdmin()) {
             return R.fail(403, "仅超级管理员可查看审计日志");
         }
 
-        LambdaQueryWrapper<SysAuditLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(userId != null, SysAuditLog::getUserId, userId);
-        wrapper.eq(StrUtil.isNotBlank(requestMethod), SysAuditLog::getRequestMethod,
+        QueryWrapper<SysAuditLog> wrapper = new QueryWrapper<>();
+        wrapper.select("user_id", "request_method", "request_uri", "client_ip", "duration_ms", "request_time");
+        wrapper.eq(userId != null, "user_id", userId);
+        wrapper.eq(StrUtil.isNotBlank(requestMethod), "request_method",
                 requestMethod == null ? null : requestMethod.trim().toUpperCase());
-        wrapper.like(StrUtil.isNotBlank(requestUri), SysAuditLog::getRequestUri, requestUri == null ? null : requestUri.trim());
-        wrapper.like(StrUtil.isNotBlank(clientIp), SysAuditLog::getClientIp, clientIp == null ? null : clientIp.trim());
-        wrapper.ge(durationMin != null, SysAuditLog::getDurationMs, durationMin);
-        wrapper.le(durationMax != null, SysAuditLog::getDurationMs, durationMax);
-        wrapper.ge(startTime != null, SysAuditLog::getRequestTime, startTime);
-        wrapper.le(endTime != null, SysAuditLog::getRequestTime, endTime);
+        wrapper.like(StrUtil.isNotBlank(requestUri), "request_uri", requestUri == null ? null : requestUri.trim());
+        wrapper.like(StrUtil.isNotBlank(clientIp), "client_ip", clientIp == null ? null : clientIp.trim());
+        wrapper.ge(durationMin != null, "duration_ms", durationMin);
+        wrapper.le(durationMax != null, "duration_ms", durationMax);
+        wrapper.ge(startTime != null, "request_time", startTime);
+        wrapper.le(endTime != null, "request_time", endTime);
 
         Set<Long> matchedUserIds = loadUserIdsByKeywordAndDept(keyword, deptName);
         if (matchedUserIds != null) {
             if (matchedUserIds.isEmpty()) {
                 return R.ok(buildPageResult(pageNum, pageSize, 0L, Collections.emptyList()));
             }
-            wrapper.in(SysAuditLog::getUserId, matchedUserIds);
+            wrapper.in("user_id", matchedUserIds);
         }
 
-        wrapper.orderByDesc(SysAuditLog::getRequestTime).orderByDesc(SysAuditLog::getId);
+        wrapper.orderByDesc("request_time").orderByDesc("id");
         IPage<SysAuditLog> page;
         try {
             page = sysAuditLogService.page(new Page<>(pageNum, pageSize), wrapper);
@@ -119,6 +126,8 @@ public class SysAuditController {
             return R.fail("审计日志表尚未初始化，请重启后端服务后重试");
         }
         List<AuditLogPageVO> records = toAuditLogVO(page.getRecords());
+        perfLog.info("审计日志分页查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), pageNum, pageSize, page.getTotal(), records.size(), System.currentTimeMillis() - startAt);
         return R.ok(buildPageResult(page.getCurrent(), page.getSize(), page.getTotal(), records));
     }
 
@@ -223,7 +232,6 @@ public class SysAuditController {
         List<AuditLogPageVO> result = new ArrayList<>();
         for (SysAuditLog item : records) {
             AuditLogPageVO vo = new AuditLogPageVO();
-            vo.setId(item.getId());
             vo.setUserId(item.getUserId());
             SysUser user = item.getUserId() == null ? null : userMap.get(item.getUserId());
             vo.setUsername(user == null ? null : user.getUsername());
@@ -232,10 +240,7 @@ public class SysAuditController {
             vo.setRequestMethod(item.getRequestMethod());
             vo.setRequestUri(item.getRequestUri());
             vo.setClientIp(item.getClientIp());
-            vo.setHttpStatus(item.getHttpStatus());
             vo.setDurationMs(item.getDurationMs());
-            vo.setTraceId(item.getTraceId());
-            vo.setUserAgent(item.getUserAgent());
             vo.setRequestTime(item.getRequestTime());
             result.add(vo);
         }

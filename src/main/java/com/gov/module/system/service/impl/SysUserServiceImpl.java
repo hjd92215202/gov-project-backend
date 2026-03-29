@@ -17,6 +17,9 @@ import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.UserAccessContext;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -39,6 +42,8 @@ import java.util.stream.Collectors;
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
+    private static final String ACCESS_CONTEXT_REQUEST_ATTR = SysUserServiceImpl.class.getName() + ".ACCESS_CONTEXT";
+
     /** 普通用户默认菜单。 */
     private static final List<String> USER_DEFAULT_MENUS = Arrays.asList("project:manage");
     /** 部门负责人默认菜单。 */
@@ -47,7 +52,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     );
     /** 管理员默认菜单。 */
     private static final List<String> ADMIN_DEFAULT_MENUS = Arrays.asList(
-            "dashboard:view", "project:manage", "project:engineering", "system:user", "system:dept", "system:role", "system:audit"
+            "dashboard:view", "project:manage", "project:engineering", "system:user", "system:dept", "system:role", "system:audit", "system:frontend-monitor"
     );
 
     @Autowired
@@ -150,17 +155,31 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     @Override
     public UserAccessContext getAccessContext(Long userId) {
+        UserAccessContext cachedContext = getCachedAccessContext(userId);
+        if (cachedContext != null) {
+            return cachedContext;
+        }
+
         UserAccessContext context = new UserAccessContext();
         context.setUserId(userId);
         if (userId == null) {
             context.setRoleCodes(new ArrayList<>(Collections.singletonList("user")));
             context.setMenuKeys(new ArrayList<>(USER_DEFAULT_MENUS));
+            cacheAccessContext(context);
             return context;
         }
 
         SysUser user = getById(userId);
         if (user != null) {
+            context.setUsername(user.getUsername());
+            context.setRealName(user.getRealName());
             context.setDeptId(user.getDeptId());
+            if (user.getDeptId() != null) {
+                SysDept dept = sysDeptService.getById(user.getDeptId());
+                if (dept != null) {
+                    context.setDeptName(dept.getDeptName());
+                }
+            }
         }
 
         List<Long> roleIds = new ArrayList<>(getRoleIdsMap(Collections.singletonList(userId))
@@ -202,6 +221,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         if (!configuredMenus.isEmpty()) {
             context.setMenuKeys(new ArrayList<>(configuredMenus));
+            cacheAccessContext(context);
             return context;
         }
 
@@ -214,6 +234,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             menuKeys.addAll(USER_DEFAULT_MENUS);
         }
         context.setMenuKeys(new ArrayList<>(menuKeys));
+        cacheAccessContext(context);
         return context;
     }
 
@@ -275,5 +296,37 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             return "user";
         }
         return code;
+    }
+
+    private UserAccessContext getCachedAccessContext(Long userId) {
+        ServletRequestAttributes attributes = currentRequestAttributes();
+        if (attributes == null) {
+            return null;
+        }
+        Object cached = attributes.getRequest().getAttribute(ACCESS_CONTEXT_REQUEST_ATTR);
+        if (!(cached instanceof UserAccessContext)) {
+            return null;
+        }
+        UserAccessContext context = (UserAccessContext) cached;
+        if (Objects.equals(context.getUserId(), userId)) {
+            return context;
+        }
+        return null;
+    }
+
+    private void cacheAccessContext(UserAccessContext context) {
+        ServletRequestAttributes attributes = currentRequestAttributes();
+        if (attributes == null || context == null) {
+            return;
+        }
+        attributes.getRequest().setAttribute(ACCESS_CONTEXT_REQUEST_ATTR, context);
+    }
+
+    private ServletRequestAttributes currentRequestAttributes() {
+        RequestAttributes attributes = RequestContextHolder.getRequestAttributes();
+        if (attributes instanceof ServletRequestAttributes) {
+            return (ServletRequestAttributes) attributes;
+        }
+        return null;
     }
 }

@@ -14,6 +14,8 @@ import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.SysDeptTreeVO;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -30,13 +32,17 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * 部门管理接口控制器。
- * 该类负责部门树展示、部门增删改，以及在部门树场景下按角色裁剪可见范围。
+ * 职责：提供部门树查询以及部门增删改接口。
+ * 为什么存在：部门树既承担权限数据范围，又承担用户归属与审批负责人链路，需要统一收口。
+ * 关键输入输出：输入为部门 DTO 或当前登录用户身份，输出为部门树 VO 或中文操作结果。
+ * 关联链路：部门管理页、用户管理页、审批负责人推导、数据范围裁剪。
  */
 @Api(tags = "部门管理")
 @RestController
 @RequestMapping("/system/dept")
 public class SysDeptController {
+
+    private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
 
     @Autowired
     private SysDeptService sysDeptService;
@@ -45,13 +51,15 @@ public class SysDeptController {
     private SysUserService sysUserService;
 
     /**
-     * 获取部门树。
-     *
-     * @return 部门树结果
+     * 职责：返回当前用户可见的部门树。
+     * 为什么存在：管理员需要看全量，部门负责人只看本部门及下级，普通用户不应访问。
+     * 关键输入输出：输入为当前登录人身份，输出为部门树 VO 列表。
+     * 关联链路：部门管理页、用户编辑页部门选择、权限数据范围。
      */
     @ApiOperation("部门树")
     @GetMapping("/tree")
     public R<List<SysDeptTreeVO>> tree() {
+        long startAt = System.currentTimeMillis();
         Long currentUserId = StpUtil.getLoginIdAsLong();
         boolean isAdmin = sysUserService.isAdmin(currentUserId);
         boolean isDeptLeader = sysUserService.isDeptLeader(currentUserId);
@@ -61,7 +69,9 @@ public class SysDeptController {
 
         List<SysDept> deptList = sysDeptService.list(new LambdaQueryWrapper<SysDept>().orderByAsc(SysDept::getId));
         if (deptList.isEmpty()) {
-            return R.ok(new ArrayList<>());
+            perfLog.info("action=deptTree userId={} scope=empty count=0 durationMs={}",
+                    currentUserId, System.currentTimeMillis() - startAt);
+            return R.ok(new ArrayList<SysDeptTreeVO>());
         }
 
         Long scopeRootId = null;
@@ -85,7 +95,7 @@ public class SysDeptController {
         Map<Long, SysDeptTreeVO> idMap = voList.stream()
                 .collect(Collectors.toMap(SysDeptTreeVO::getId, item -> item, (a, b) -> a));
 
-        List<SysDeptTreeVO> rootList = new ArrayList<>();
+        List<SysDeptTreeVO> rootList = new ArrayList<SysDeptTreeVO>();
         for (SysDeptTreeVO vo : voList) {
             Long parentId = vo.getParentId();
             if (parentId == null || parentId == 0 || !idMap.containsKey(parentId)) {
@@ -95,26 +105,32 @@ public class SysDeptController {
             }
         }
 
+        List<SysDeptTreeVO> result = rootList;
         if (scopeRootId != null) {
+            result = new ArrayList<SysDeptTreeVO>();
             for (SysDeptTreeVO root : rootList) {
                 if (Objects.equals(root.getId(), scopeRootId)) {
-                    return R.ok(Collections.singletonList(root));
+                    result.add(root);
+                    break;
                 }
             }
-            return R.ok(new ArrayList<>());
         }
-        return R.ok(rootList);
+
+        perfLog.info("action=deptTree userId={} scopeRootId={} count={} durationMs={}",
+                currentUserId, scopeRootId, result.size(), System.currentTimeMillis() - startAt);
+        return R.ok(result);
     }
 
     /**
-     * 新增部门。
-     *
-     * @param payload 部门创建 DTO
-     * @return 创建结果
+     * 职责：新增部门。
+     * 为什么存在：统一校验上级部门、负责人信息与管理员权限边界。
+     * 关键输入输出：输入为部门创建 DTO，输出为中文创建结果。
+     * 关联链路：部门管理新增弹窗。
      */
     @ApiOperation("新增部门")
     @PostMapping("/add")
     public R<String> add(@RequestBody DeptCreateDTO payload) {
+        long startAt = System.currentTimeMillis();
         SysDept dept = toCreateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可新增部门");
@@ -126,18 +142,21 @@ public class SysDeptController {
             dept.setParentId(0L);
         }
         sysDeptService.save(dept);
+        perfLog.info("action=deptAdd operatorUserId={} deptId={} parentId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), dept.getId(), dept.getParentId(), System.currentTimeMillis() - startAt);
         return R.ok("部门创建成功");
     }
 
     /**
-     * 更新部门。
-     *
-     * @param payload 部门更新 DTO
-     * @return 更新结果
+     * 职责：更新部门。
+     * 为什么存在：部门树关系和负责人信息会影响审批链路，需要统一校验。
+     * 关键输入输出：输入为部门更新 DTO，输出为中文更新结果。
+     * 关联链路：部门管理编辑弹窗。
      */
     @ApiOperation("更新部门")
     @PutMapping("/update")
     public R<String> update(@RequestBody DeptUpdateDTO payload) {
+        long startAt = System.currentTimeMillis();
         SysDept dept = toUpdateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可更新部门");
@@ -152,18 +171,21 @@ public class SysDeptController {
             return R.fail("上级部门不能为自身");
         }
         sysDeptService.updateById(dept);
+        perfLog.info("action=deptUpdate operatorUserId={} deptId={} parentId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), dept.getId(), dept.getParentId(), System.currentTimeMillis() - startAt);
         return R.ok("部门更新成功");
     }
 
     /**
-     * 删除部门。
-     *
-     * @param id 部门 ID
-     * @return 删除结果
+     * 职责：删除部门。
+     * 为什么存在：删除前必须确保没有子部门和部门用户，避免破坏组织结构。
+     * 关键输入输出：输入为部门 ID，输出为中文删除结果。
+     * 关联链路：部门管理列表页删除动作。
      */
     @ApiOperation("删除部门")
     @DeleteMapping("/{id}")
     public R<String> delete(@PathVariable Long id) {
+        long startAt = System.currentTimeMillis();
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可删除部门");
         }
@@ -179,15 +201,11 @@ public class SysDeptController {
         }
 
         sysDeptService.removeById(id);
+        perfLog.info("action=deptDelete operatorUserId={} deptId={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), id, System.currentTimeMillis() - startAt);
         return R.ok("部门删除成功");
     }
 
-    /**
-     * 把创建 DTO 转为部门实体。
-     *
-     * @param payload 创建 DTO
-     * @return 部门实体
-     */
     private SysDept toCreateDeptEntity(DeptCreateDTO payload) {
         SysDept dept = new SysDept();
         if (payload == null) {
@@ -199,12 +217,6 @@ public class SysDeptController {
         return dept;
     }
 
-    /**
-     * 把更新 DTO 转为部门实体。
-     *
-     * @param payload 更新 DTO
-     * @return 部门实体
-     */
     private SysDept toUpdateDeptEntity(DeptUpdateDTO payload) {
         SysDept dept = new SysDept();
         if (payload == null) {
@@ -217,22 +229,15 @@ public class SysDeptController {
         return dept;
     }
 
-    /**
-     * 在已有部门列表中计算指定根部门的可见范围。
-     *
-     * @param rootDeptId 根部门 ID
-     * @param allDeptList 全量部门列表
-     * @return 部门范围集合
-     */
     private Set<Long> getScopedDeptIds(Long rootDeptId, List<SysDept> allDeptList) {
-        Map<Long, List<Long>> childMap = new HashMap<>();
+        Map<Long, List<Long>> childMap = new HashMap<Long, List<Long>>();
         for (SysDept dept : allDeptList) {
             Long parentId = dept.getParentId() == null ? 0L : dept.getParentId();
-            childMap.computeIfAbsent(parentId, key -> new ArrayList<>()).add(dept.getId());
+            childMap.computeIfAbsent(parentId, key -> new ArrayList<Long>()).add(dept.getId());
         }
 
-        Set<Long> scopedDeptIds = new HashSet<>();
-        Deque<Long> queue = new ArrayDeque<>();
+        Set<Long> scopedDeptIds = new HashSet<Long>();
+        Deque<Long> queue = new ArrayDeque<Long>();
         queue.offer(rootDeptId);
         while (!queue.isEmpty()) {
             Long deptId = queue.poll();
@@ -247,16 +252,10 @@ public class SysDeptController {
         return scopedDeptIds;
     }
 
-    /**
-     * 批量构建部门负责人姓名映射。
-     *
-     * @param deptList 部门列表
-     * @return 负责人姓名映射
-     */
     private Map<Long, String> buildLeaderMap(List<SysDept> deptList) {
         Set<Long> userIds = deptList.stream().map(SysDept::getLeaderId).filter(Objects::nonNull).collect(Collectors.toSet());
         if (userIds.isEmpty()) {
-            return new HashMap<>();
+            return new HashMap<Long, String>();
         }
         return sysUserService.listByIds(userIds).stream().collect(Collectors.toMap(SysUser::getId, item -> {
             if (StrUtil.isNotBlank(item.getRealName())) {

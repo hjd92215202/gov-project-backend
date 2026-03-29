@@ -1,5 +1,6 @@
 package com.gov.module.flow.service;
 
+import cn.dev33.satoken.stp.StpUtil;
 import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.system.entity.SysDept;
@@ -18,14 +19,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,7 +84,12 @@ class FlowServiceTest {
         when(processQuery.singleResult()).thenReturn(processInstance);
         when(processInstance.getBusinessKey()).thenReturn("88");
 
-        flowService.approve("task-1", false);
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(StpUtil::getLoginIdAsString).thenReturn("100");
+            when(task.getAssignee()).thenReturn("100");
+
+            flowService.approve("task-1", false);
+        }
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass(Map.class);
@@ -129,7 +139,11 @@ class FlowServiceTest {
         when(sysDeptService.getById(10L)).thenReturn(currentDept);
         when(sysDeptService.getById(11L)).thenReturn(parentDept);
 
-        flowService.approve("task-2", true);
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(StpUtil::getLoginIdAsString).thenReturn("200");
+
+            flowService.approve("task-2", true);
+        }
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass(Map.class);
@@ -176,7 +190,11 @@ class FlowServiceTest {
         when(sysDeptService.getById(20L)).thenReturn(currentDept);
         when(sysDeptService.getById(0L)).thenReturn(null);
 
-        flowService.approve("task-3", true);
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(StpUtil::getLoginIdAsString).thenReturn("210");
+
+            flowService.approve("task-3", true);
+        }
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<Map<String, Object>> varsCaptor = ArgumentCaptor.forClass(Map.class);
@@ -187,5 +205,29 @@ class FlowServiceTest {
         ArgumentCaptor<BizProject> projectCaptor = ArgumentCaptor.forClass(BizProject.class);
         verify(bizProjectService).updateById(projectCaptor.capture());
         assertEquals(Integer.valueOf(2), projectCaptor.getValue().getStatus());
+    }
+
+    /**
+     * 作用：验证非当前办理人不能越权处理审批任务。
+     */
+    @Test
+    void approve_shouldRejectWhenTaskDoesNotBelongToCurrentUser() {
+        TaskQuery taskQuery = mock(TaskQuery.class);
+        Task task = mock(Task.class);
+
+        when(taskService.createTaskQuery()).thenReturn(taskQuery);
+        when(taskQuery.taskId("task-4")).thenReturn(taskQuery);
+        when(taskQuery.singleResult()).thenReturn(task);
+        when(task.getAssignee()).thenReturn("300");
+
+        try (MockedStatic<StpUtil> stpUtil = mockStatic(StpUtil.class)) {
+            stpUtil.when(StpUtil::getLoginIdAsString).thenReturn("999");
+
+            RuntimeException error = assertThrows(RuntimeException.class, () -> flowService.approve("task-4", true));
+            assertEquals("当前任务不属于当前登录用户", error.getMessage());
+        }
+
+        verify(taskService, never()).complete(eq("task-4"), org.mockito.ArgumentMatchers.anyMap());
+        verify(bizProjectService, never()).updateById(org.mockito.ArgumentMatchers.any(BizProject.class));
     }
 }

@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -32,10 +33,20 @@ public class AuditAccessFilter extends OncePerRequestFilter {
 
     private static final String AUDIT_USER_ID_ATTR = "audit.userId";
     private static final String TRACE_ID_KEY = "traceId";
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuditAccessFilter.class);
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("com.gov.audit");
 
     @Autowired(required = false)
     private SysAuditLogService sysAuditLogService;
+
+    @Value("${gov.logging.slow-request-ms:800}")
+    private long slowRequestThresholdMs;
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String uri = request == null ? null : request.getRequestURI();
+        return StrUtil.isNotBlank(uri) && uri.contains("/system/frontend-monitor/report");
+    }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
@@ -62,6 +73,10 @@ public class AuditAccessFilter extends OncePerRequestFilter {
 
             AUDIT_LOGGER.info("method={}, uri={}, userId={}, ip={}, status={}, durationMs={}",
                     method, uri, userId, clientIp, status, duration);
+            if (duration >= slowRequestThresholdMs) {
+                LOGGER.warn("检测到慢接口 method={}, uri={}, userId={}, status={}, durationMs={}, traceId={}",
+                        method, uri, userId, status, duration, traceId);
+            }
             persistAuditLog(userId, method, uri, clientIp, status, duration, traceId, requestTime, request);
         }
     }

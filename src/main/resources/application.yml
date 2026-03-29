@@ -79,3 +79,7 @@ gov:
     max-history-days: 30
     max-file-size: 20MB
     total-size-cap: 2GB
+    slow-request-ms: 800
+    cleanup-cron: 0 30 3 * * ?
+    audit-retain-days: 180
+    frontend-monitor-retain-days: 30
