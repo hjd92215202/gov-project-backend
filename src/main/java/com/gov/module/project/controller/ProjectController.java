@@ -14,6 +14,7 @@ import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.ProjectDetailVO;
 import com.gov.module.project.vo.ProjectMapVO;
+import com.gov.module.project.vo.ProjectMapSummaryVO;
 import com.gov.module.project.vo.ProjectPageVO;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
@@ -32,6 +33,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Comparator;
 import java.util.regex.Pattern;
 
 /**
@@ -437,6 +439,75 @@ public class ProjectController {
      * @param accessContext 当前访问上下文
      * @return 是否可操作
      */
+    /**
+     * 获取地图汇总列表。
+     * 该接口用于省级按市、市级按区县返回审批通过项目数量，减少首页首屏和下钻阶段的点位数据传输量。
+     *
+     * @param level 汇总层级，支持 city / district
+     * @param province 省份筛选
+     * @param city 城市筛选
+     * @param district 区县筛选
+     * @return 地图汇总列表
+     */
+    @ApiOperation("地图汇总列表")
+    @GetMapping("/map/summary")
+    public R<List<ProjectMapSummaryVO>> getMapSummary(
+            @RequestParam(defaultValue = "city") String level,
+            @RequestParam(required = false) String province,
+            @RequestParam(required = false) String city,
+            @RequestParam(required = false) String district
+    ) {
+        long startAt = System.currentTimeMillis();
+        String normalizedLevel = StrUtil.trimToEmpty(level).toLowerCase();
+        if (!Objects.equals(normalizedLevel, "city") && !Objects.equals(normalizedLevel, "district")) {
+            return R.fail("地图汇总层级仅支持 city 或 district");
+        }
+        if (Objects.equals(normalizedLevel, "district") && StrUtil.isBlank(city)) {
+            return R.fail("按区县汇总时必须传入城市名称");
+        }
+
+        LambdaQueryWrapper<BizProject> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.select(
+                BizProject::getProvince,
+                BizProject::getCity,
+                BizProject::getDistrict
+        );
+        queryWrapper.eq(StrUtil.isNotBlank(province), BizProject::getProvince, province);
+        queryWrapper.eq(StrUtil.isNotBlank(city), BizProject::getCity, city);
+        queryWrapper.eq(StrUtil.isNotBlank(district), BizProject::getDistrict, district);
+        queryWrapper.eq(BizProject::getStatus, 2);
+
+        if (!applyProjectScope(queryWrapper, currentAccessContext())) {
+            return R.ok(new ArrayList<>());
+        }
+
+        Map<String, Long> summaryMap = new HashMap<>();
+        for (BizProject item : bizProjectService.list(queryWrapper)) {
+            String regionName = Objects.equals(normalizedLevel, "city") ? item.getCity() : item.getDistrict();
+            if (StrUtil.isBlank(regionName)) {
+                continue;
+            }
+            summaryMap.merge(regionName.trim(), 1L, Long::sum);
+        }
+
+        List<ProjectMapSummaryVO> result = new ArrayList<>();
+        summaryMap.forEach((regionName, projectCount) -> {
+            ProjectMapSummaryVO vo = new ProjectMapSummaryVO();
+            vo.setRegionLevel(normalizedLevel);
+            vo.setRegionName(regionName);
+            vo.setProjectCount(projectCount);
+            result.add(vo);
+        });
+        result.sort(
+                Comparator.comparing(ProjectMapSummaryVO::getProjectCount, Comparator.nullsLast(Long::compareTo)).reversed()
+                        .thenComparing(ProjectMapSummaryVO::getRegionName, Comparator.nullsLast(String::compareTo))
+        );
+
+        perfLog.info("地图汇总查询完成 userId={} level={} province={} city={} district={} count={} durationMs={}",
+                StpUtil.getLoginIdAsLong(), normalizedLevel, province, city, district, result.size(), System.currentTimeMillis() - startAt);
+        return R.ok(result);
+    }
+
     private boolean canOperateProject(BizProject project, UserAccessContext accessContext) {
         if (accessContext.isAdmin()) {
             return true;
@@ -689,3 +760,4 @@ public class ProjectController {
         return sysUserService.getAccessContext(StpUtil.getLoginIdAsLong());
     }
 }
+
