@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import java.util.stream.Collectors;
 
 /**
@@ -83,21 +84,33 @@ public class FlowService {
     public IPage<FlowTaskVO> getTodoPage(Integer pageNum, Integer pageSize) {
         long startAt = System.currentTimeMillis();
         String userId = StpUtil.getLoginIdAsString();
-        long total = taskService.createTaskQuery().taskAssignee(userId).count();
         int current = normalizePageNum(pageNum);
         int size = normalizePageSize(pageSize);
         int offset = (current - 1) * size;
 
+        long listStartAt = System.currentTimeMillis();
         List<Task> tasks = taskService.createTaskQuery()
                 .taskAssignee(userId)
                 .orderByTaskCreateTime().desc()
                 .listPage(offset, size);
+        long listMs = System.currentTimeMillis() - listStartAt;
 
+        long countStartAt = System.currentTimeMillis();
+        long total = resolvePagedTotal(current, size, tasks.size(),
+                () -> taskService.createTaskQuery().taskAssignee(userId).count());
+        long countMs = System.currentTimeMillis() - countStartAt;
+
+        long processStartAt = System.currentTimeMillis();
         Map<String, String> processBusinessKeyMap = loadRuntimeBusinessKeys(
                 tasks.stream().map(Task::getProcessInstanceId).collect(Collectors.toCollection(LinkedHashSet::new))
         );
-        Map<String, BizProject> projectMap = loadProjectMap(processBusinessKeyMap.values());
+        long processMs = System.currentTimeMillis() - processStartAt;
 
+        long projectStartAt = System.currentTimeMillis();
+        Map<String, BizProject> projectMap = loadProjectMap(processBusinessKeyMap.values());
+        long projectMs = System.currentTimeMillis() - projectStartAt;
+
+        long assembleStartAt = System.currentTimeMillis();
         List<FlowTaskVO> records = new ArrayList<>();
         for (Task task : tasks) {
             FlowTaskVO vo = new FlowTaskVO();
@@ -115,10 +128,20 @@ public class FlowService {
             }
             records.add(vo);
         }
+        long assembleMs = System.currentTimeMillis() - assembleStartAt;
 
         IPage<FlowTaskVO> page = buildPage(current, size, total, records);
-        perfLog.info("审批待办查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
-                userId, current, size, total, records.size(), System.currentTimeMillis() - startAt);
+        long totalDurationMs = System.currentTimeMillis() - startAt;
+        perfLog.info(
+                "审批待办查询完成 userId={} pageNum={} pageSize={} total={} records={} listMs={} countMs={} processMs={} projectMs={} assembleMs={} durationMs={}",
+                userId, current, size, total, records.size(), listMs, countMs, processMs, projectMs, assembleMs, totalDurationMs
+        );
+        if (totalDurationMs >= 2000) {
+            perfLog.warn(
+                    "审批待办查询慢调用 userId={} pageNum={} pageSize={} total={} records={} listMs={} countMs={} processMs={} projectMs={} assembleMs={} durationMs={}",
+                    userId, current, size, total, records.size(), listMs, countMs, processMs, projectMs, assembleMs, totalDurationMs
+            );
+        }
         return page;
     }
 
@@ -132,28 +155,40 @@ public class FlowService {
     public IPage<FlowTaskVO> getDonePage(Integer pageNum, Integer pageSize) {
         long startAt = System.currentTimeMillis();
         String userId = StpUtil.getLoginIdAsString();
-        long total = historyService.createHistoricTaskInstanceQuery()
-                .taskAssignee(userId)
-                .finished()
-                .count();
         int current = normalizePageNum(pageNum);
         int size = normalizePageSize(pageSize);
         int offset = (current - 1) * size;
 
+        long listStartAt = System.currentTimeMillis();
         List<HistoricTaskInstance> tasks = historyService.createHistoricTaskInstanceQuery()
                 .taskAssignee(userId)
                 .finished()
                 .orderByHistoricTaskInstanceEndTime().desc()
                 .listPage(offset, size);
+        long listMs = System.currentTimeMillis() - listStartAt;
 
+        long countStartAt = System.currentTimeMillis();
+        long total = resolvePagedTotal(current, size, tasks.size(),
+                () -> historyService.createHistoricTaskInstanceQuery()
+                        .taskAssignee(userId)
+                        .finished()
+                        .count());
+        long countMs = System.currentTimeMillis() - countStartAt;
+
+        long processStartAt = System.currentTimeMillis();
         Map<String, HistoricProcessInstance> processMap = loadHistoricProcesses(
                 tasks.stream().map(HistoricTaskInstance::getProcessInstanceId).collect(Collectors.toCollection(LinkedHashSet::new))
         );
+        long processMs = System.currentTimeMillis() - processStartAt;
+
+        long projectStartAt = System.currentTimeMillis();
         Map<String, BizProject> projectMap = loadProjectMap(processMap.values().stream()
                 .map(HistoricProcessInstance::getBusinessKey)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList()));
+        long projectMs = System.currentTimeMillis() - projectStartAt;
 
+        long assembleStartAt = System.currentTimeMillis();
         List<FlowTaskVO> records = new ArrayList<>();
         for (HistoricTaskInstance task : tasks) {
             FlowTaskVO vo = new FlowTaskVO();
@@ -173,10 +208,20 @@ public class FlowService {
             }
             records.add(vo);
         }
+        long assembleMs = System.currentTimeMillis() - assembleStartAt;
 
         IPage<FlowTaskVO> page = buildPage(current, size, total, records);
-        perfLog.info("审批已办查询完成 userId={} pageNum={} pageSize={} total={} records={} durationMs={}",
-                userId, current, size, total, records.size(), System.currentTimeMillis() - startAt);
+        long totalDurationMs = System.currentTimeMillis() - startAt;
+        perfLog.info(
+                "审批已办查询完成 userId={} pageNum={} pageSize={} total={} records={} listMs={} countMs={} processMs={} projectMs={} assembleMs={} durationMs={}",
+                userId, current, size, total, records.size(), listMs, countMs, processMs, projectMs, assembleMs, totalDurationMs
+        );
+        if (totalDurationMs >= 2000) {
+            perfLog.warn(
+                    "审批已办查询慢调用 userId={} pageNum={} pageSize={} total={} records={} listMs={} countMs={} processMs={} projectMs={} assembleMs={} durationMs={}",
+                    userId, current, size, total, records.size(), listMs, countMs, processMs, projectMs, assembleMs, totalDurationMs
+            );
+        }
         return page;
     }
 
@@ -345,6 +390,13 @@ public class FlowService {
 
     private int normalizePageSize(Integer pageSize) {
         return pageSize == null || pageSize < 1 ? 10 : pageSize;
+    }
+
+    private long resolvePagedTotal(int current, int size, int currentPageRecords, LongSupplier totalCountSupplier) {
+        if (current <= 1 && currentPageRecords < size) {
+            return currentPageRecords;
+        }
+        return totalCountSupplier.getAsLong();
     }
 
     private void updateProjectStatus(String id, Integer status) {
