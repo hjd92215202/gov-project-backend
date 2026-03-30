@@ -33,6 +33,7 @@ docker run -d `
   server /data --console-address ":9001"
 ```
 
+
 ### 3.2 openGauss
 ```powershell
 docker run --name opengauss --privileged=true -d `
