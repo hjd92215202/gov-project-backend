@@ -11,6 +11,7 @@ import com.gov.module.project.dto.ProjectCreateDTO;
 import com.gov.module.project.dto.ProjectSubmitDTO;
 import com.gov.module.project.dto.ProjectUpdateDTO;
 import com.gov.module.project.entity.BizProject;
+import com.gov.module.project.mapper.BizProjectMapper;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.ProjectDetailVO;
 import com.gov.module.project.vo.ProjectMapVO;
@@ -33,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Comparator;
 import java.util.regex.Pattern;
 
 /**
@@ -60,6 +60,9 @@ public class ProjectController {
 
     @Autowired
     private FlowService flowService;
+
+    @Autowired
+    private BizProjectMapper bizProjectMapper;
 
     /**
      * 新增项目草稿。
@@ -393,40 +396,36 @@ public class ProjectController {
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String district
     ) {
-        long startAt = System.currentTimeMillis();
-        LambdaQueryWrapper<BizProject> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.select(
-                BizProject::getId,
-                BizProject::getProjectName,
-                BizProject::getAddress,
-                BizProject::getLongitude,
-                BizProject::getLatitude,
-                BizProject::getProvince,
-                BizProject::getCity,
-                BizProject::getDistrict
-        );
-        queryWrapper.eq(StrUtil.isNotBlank(province), BizProject::getProvince, province);
-        queryWrapper.eq(StrUtil.isNotBlank(city), BizProject::getCity, city);
-        queryWrapper.eq(StrUtil.isNotBlank(district), BizProject::getDistrict, district);
-        queryWrapper.eq(BizProject::getStatus, 2);
+        long requestStartAt = System.currentTimeMillis();
+        long startAt = requestStartAt;
+        String normalizedProvince = StrUtil.trimToNull(province);
+        String normalizedCity = StrUtil.trimToNull(city);
+        String normalizedDistrict = StrUtil.trimToNull(district);
 
-        if (!applyProjectScope(queryWrapper, currentAccessContext())) {
+        long scopeStartAt = System.currentTimeMillis();
+        MapScope mapScope = resolveMapScope(currentAccessContext());
+        long scopeResolveMs = System.currentTimeMillis() - scopeStartAt;
+        if (!mapScope.isAllowed()) {
+            perfLog.info("map_list_perf userId={} scopeMode={} province={} city={} district={} allowed=false scopeResolveMs={} totalMs={}",
+                    StpUtil.getLoginIdAsLong(), mapScope.getScopeMode(), normalizedProvince, normalizedCity, normalizedDistrict,
+                    scopeResolveMs, System.currentTimeMillis() - requestStartAt);
             return R.ok(new ArrayList<>());
         }
 
-        List<ProjectMapVO> result = new ArrayList<>();
-        for (BizProject item : bizProjectService.list(queryWrapper)) {
-            ProjectMapVO vo = new ProjectMapVO();
-            vo.setId(item.getId());
-            vo.setProjectName(item.getProjectName());
-            vo.setAddress(item.getAddress());
-            vo.setLongitude(item.getLongitude());
-            vo.setLatitude(item.getLatitude());
-            vo.setProvince(item.getProvince());
-            vo.setCity(item.getCity());
-            vo.setDistrict(item.getDistrict());
-            result.add(vo);
-        }
+        long queryStartAt = System.currentTimeMillis();
+        List<ProjectMapVO> result = bizProjectMapper.selectApprovedMapList(
+                normalizedProvince,
+                normalizedCity,
+                normalizedDistrict,
+                mapScope.getScopeMode(),
+                mapScope.getScopeDeptId(),
+                mapScope.getScopeUserId()
+        );
+        long queryMs = System.currentTimeMillis() - queryStartAt;
+        long totalMs = System.currentTimeMillis() - requestStartAt;
+        perfLog.info("map_list_perf userId={} scopeMode={} province={} city={} district={} allowed=true count={} scopeResolveMs={} queryMs={} totalMs={}",
+                StpUtil.getLoginIdAsLong(), mapScope.getScopeMode(), normalizedProvince, normalizedCity, normalizedDistrict,
+                result.size(), scopeResolveMs, queryMs, totalMs);
         perfLog.info("项目地图点位查询完成 userId={} province={} city={} district={} count={} durationMs={}",
                 StpUtil.getLoginIdAsLong(), province, city, district, result.size(), System.currentTimeMillis() - startAt);
         return R.ok(result);
@@ -457,55 +456,106 @@ public class ProjectController {
             @RequestParam(required = false) String city,
             @RequestParam(required = false) String district
     ) {
-        long startAt = System.currentTimeMillis();
+        long requestStartAt = System.currentTimeMillis();
+        long startAt = requestStartAt;
         String normalizedLevel = StrUtil.trimToEmpty(level).toLowerCase();
+        String normalizedProvince = StrUtil.trimToNull(province);
+        String normalizedCity = StrUtil.trimToNull(city);
+        String normalizedDistrict = StrUtil.trimToNull(district);
+        long validationMs = System.currentTimeMillis() - requestStartAt;
         if (!Objects.equals(normalizedLevel, "city") && !Objects.equals(normalizedLevel, "district")) {
             return R.fail("地图汇总层级仅支持 city 或 district");
         }
-        if (Objects.equals(normalizedLevel, "district") && StrUtil.isBlank(city)) {
+        if (Objects.equals(normalizedLevel, "district") && StrUtil.isBlank(normalizedCity)) {
             return R.fail("按区县汇总时必须传入城市名称");
         }
 
-        LambdaQueryWrapper<BizProject> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.select(
-                BizProject::getProvince,
-                BizProject::getCity,
-                BizProject::getDistrict
-        );
-        queryWrapper.eq(StrUtil.isNotBlank(province), BizProject::getProvince, province);
-        queryWrapper.eq(StrUtil.isNotBlank(city), BizProject::getCity, city);
-        queryWrapper.eq(StrUtil.isNotBlank(district), BizProject::getDistrict, district);
-        queryWrapper.eq(BizProject::getStatus, 2);
-
-        if (!applyProjectScope(queryWrapper, currentAccessContext())) {
+        long scopeStartAt = System.currentTimeMillis();
+        MapScope mapScope = resolveMapScope(currentAccessContext());
+        long scopeResolveMs = System.currentTimeMillis() - scopeStartAt;
+        if (!mapScope.isAllowed()) {
+            perfLog.info("map_summary_perf userId={} level={} scopeMode={} province={} city={} district={} allowed=false validationMs={} scopeResolveMs={} totalMs={}",
+                    StpUtil.getLoginIdAsLong(), normalizedLevel, mapScope.getScopeMode(), normalizedProvince, normalizedCity, normalizedDistrict,
+                    validationMs, scopeResolveMs, System.currentTimeMillis() - requestStartAt);
             return R.ok(new ArrayList<>());
         }
 
-        Map<String, Long> summaryMap = new HashMap<>();
-        for (BizProject item : bizProjectService.list(queryWrapper)) {
-            String regionName = Objects.equals(normalizedLevel, "city") ? item.getCity() : item.getDistrict();
-            if (StrUtil.isBlank(regionName)) {
-                continue;
-            }
-            summaryMap.merge(regionName.trim(), 1L, Long::sum);
-        }
-
-        List<ProjectMapSummaryVO> result = new ArrayList<>();
-        summaryMap.forEach((regionName, projectCount) -> {
-            ProjectMapSummaryVO vo = new ProjectMapSummaryVO();
-            vo.setRegionLevel(normalizedLevel);
-            vo.setRegionName(regionName);
-            vo.setProjectCount(projectCount);
-            result.add(vo);
-        });
-        result.sort(
-                Comparator.comparing(ProjectMapSummaryVO::getProjectCount, Comparator.nullsLast(Long::compareTo)).reversed()
-                        .thenComparing(ProjectMapSummaryVO::getRegionName, Comparator.nullsLast(String::compareTo))
+        long queryStartAt = System.currentTimeMillis();
+        List<ProjectMapSummaryVO> result = bizProjectMapper.selectApprovedMapSummary(
+                normalizedLevel,
+                normalizedProvince,
+                normalizedCity,
+                normalizedDistrict,
+                mapScope.getScopeMode(),
+                mapScope.getScopeDeptId(),
+                mapScope.getScopeUserId()
         );
+        long queryMs = System.currentTimeMillis() - queryStartAt;
+        long totalMs = System.currentTimeMillis() - requestStartAt;
+        perfLog.info("map_summary_perf userId={} level={} scopeMode={} province={} city={} district={} allowed=true count={} validationMs={} scopeResolveMs={} queryMs={} totalMs={}",
+                StpUtil.getLoginIdAsLong(), normalizedLevel, mapScope.getScopeMode(), normalizedProvince, normalizedCity, normalizedDistrict,
+                result.size(), validationMs, scopeResolveMs, queryMs, totalMs);
 
         perfLog.info("地图汇总查询完成 userId={} level={} province={} city={} district={} count={} durationMs={}",
                 StpUtil.getLoginIdAsLong(), normalizedLevel, province, city, district, result.size(), System.currentTimeMillis() - startAt);
         return R.ok(result);
+    }
+
+    private MapScope resolveMapScope(UserAccessContext accessContext) {
+        if (accessContext == null) {
+            return MapScope.denied(2, null, null);
+        }
+        if (accessContext.isAdmin()) {
+            return MapScope.allowed(0, null, null);
+        }
+        if (accessContext.isDeptLeader()) {
+            if (accessContext.getDeptId() == null) {
+                return MapScope.denied(1, null, null);
+            }
+            return MapScope.allowed(1, accessContext.getDeptId(), null);
+        }
+        if (accessContext.getUserId() == null) {
+            return MapScope.denied(2, null, null);
+        }
+        return MapScope.allowed(2, null, accessContext.getUserId());
+    }
+
+    private static final class MapScope {
+        private final int scopeMode;
+        private final Long scopeDeptId;
+        private final Long scopeUserId;
+        private final boolean allowed;
+
+        private MapScope(int scopeMode, Long scopeDeptId, Long scopeUserId, boolean allowed) {
+            this.scopeMode = scopeMode;
+            this.scopeDeptId = scopeDeptId;
+            this.scopeUserId = scopeUserId;
+            this.allowed = allowed;
+        }
+
+        private static MapScope allowed(int scopeMode, Long scopeDeptId, Long scopeUserId) {
+            return new MapScope(scopeMode, scopeDeptId, scopeUserId, true);
+        }
+
+        private static MapScope denied(int scopeMode, Long scopeDeptId, Long scopeUserId) {
+            return new MapScope(scopeMode, scopeDeptId, scopeUserId, false);
+        }
+
+        private int getScopeMode() {
+            return scopeMode;
+        }
+
+        private Long getScopeDeptId() {
+            return scopeDeptId;
+        }
+
+        private Long getScopeUserId() {
+            return scopeUserId;
+        }
+
+        private boolean isAllowed() {
+            return allowed;
+        }
     }
 
     private boolean canOperateProject(BizProject project, UserAccessContext accessContext) {
@@ -760,4 +810,3 @@ public class ProjectController {
         return sysUserService.getAccessContext(StpUtil.getLoginIdAsLong());
     }
 }
-

@@ -22,10 +22,9 @@ import java.io.IOException;
 import java.util.Date;
 
 /**
- * 职责：记录接口访问审计日志，并落库用于后台审计页面查询。
- * 为什么存在：统一沉淀“谁在何时从哪个 IP 调用了什么接口、结果如何”。
- * 关键输入输出：输入为请求/响应元信息，输出为审计日志文件 + `sys_audit_log` 表记录。
- * 关联链路：全站接口 -> AuditAccessFilter -> 审计日志与审计列表。
+ * 职责：记录接口访问审计信息，并输出慢请求观测日志。
+ * 为什么存在：审计日志要完整，但不能牺牲用户点击后的主链路响应时间，
+ * 因此这里改为“同步采集 + 异步落库”模式。
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -35,6 +34,7 @@ public class AuditAccessFilter extends OncePerRequestFilter {
     private static final String TRACE_ID_KEY = "traceId";
     private static final Logger LOGGER = LoggerFactory.getLogger(AuditAccessFilter.class);
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("com.gov.audit");
+    private static final Logger PERF_LOGGER = LoggerFactory.getLogger("com.gov.perf");
 
     @Autowired(required = false)
     private SysAuditLogService sysAuditLogService;
@@ -56,28 +56,59 @@ public class AuditAccessFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String uri = request.getRequestURI();
 
-        // 在进入业务链路前先尝试一次，避免请求结束后上下文清理导致丢失登录态信息。
-        String earlyResolvedUserId = resolveUserId(request);
-        if (StrUtil.isNotBlank(earlyResolvedUserId) && !"anonymous".equals(earlyResolvedUserId)) {
-            request.setAttribute(AUDIT_USER_ID_ATTR, earlyResolvedUserId);
+        // 先把 userId 固化到请求属性，避免后续鉴权上下文被清理后无法追溯操作人。
+        String resolvedUserId = resolveUserId(request);
+        if (StrUtil.isNotBlank(resolvedUserId) && !"anonymous".equals(resolvedUserId)) {
+            request.setAttribute(AUDIT_USER_ID_ATTR, resolvedUserId);
         }
 
         try {
             filterChain.doFilter(request, response);
         } finally {
-            long duration = System.currentTimeMillis() - startAt;
+            long durationMs = System.currentTimeMillis() - startAt;
             String userId = resolveUserId(request);
             String clientIp = resolveClientIp(request);
             String traceId = MDC.get(TRACE_ID_KEY);
             int status = response.getStatus();
 
             AUDIT_LOGGER.info("method={}, uri={}, userId={}, ip={}, status={}, durationMs={}",
-                    method, uri, userId, clientIp, status, duration);
-            if (duration >= slowRequestThresholdMs) {
-                LOGGER.warn("检测到慢接口 method={}, uri={}, userId={}, status={}, durationMs={}, traceId={}",
-                        method, uri, userId, status, duration, traceId);
+                    method, uri, userId, clientIp, status, durationMs);
+            if (durationMs >= slowRequestThresholdMs) {
+                LOGGER.warn("慢请求告警 method={} uri={} userId={} status={} durationMs={} traceId={}",
+                        method, uri, userId, status, durationMs, traceId);
             }
-            persistAuditLog(userId, method, uri, clientIp, status, duration, traceId, requestTime, request);
+
+            long enqueueStartAt = System.currentTimeMillis();
+            boolean enqueued = enqueueAuditLog(userId, method, uri, clientIp, status, durationMs, traceId, requestTime, request);
+            long enqueueMs = System.currentTimeMillis() - enqueueStartAt;
+
+            PERF_LOGGER.info("audit_enqueue_perf method={} uri={} userId={} enqueued={} enqueueMs={} totalDurationMs={} traceId={}",
+                    method, uri, userId, enqueued, enqueueMs, durationMs, traceId);
+        }
+    }
+
+    private boolean enqueueAuditLog(String userId, String method, String uri, String clientIp, int status,
+                                    long durationMs, String traceId, Date requestTime, HttpServletRequest request) {
+        if (sysAuditLogService == null) {
+            return false;
+        }
+        try {
+            SysAuditLog auditLog = new SysAuditLog();
+            auditLog.setUserId(parseLong(userId));
+            auditLog.setRequestMethod(method);
+            auditLog.setRequestUri(uri);
+            auditLog.setClientIp(clientIp);
+            auditLog.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
+            auditLog.setHttpStatus(status);
+            auditLog.setDurationMs(durationMs);
+            auditLog.setTraceId(truncate(traceId, 64));
+            auditLog.setRequestTime(requestTime);
+            sysAuditLogService.saveAsync(auditLog);
+            return true;
+        } catch (Exception exception) {
+            LOGGER.warn("审计日志入队失败 uri={} userId={} traceId={} message={}",
+                    uri, userId, traceId, exception.getMessage());
+            return false;
         }
     }
 
@@ -93,7 +124,7 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                 return String.valueOf(loginId);
             }
         } catch (Exception ignored) {
-            // ignore
+            // 忽略鉴权上下文读取异常，继续尝试 token 反查。
         }
 
         String tokenValue = extractTokenValue(request);
@@ -104,33 +135,11 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                     return String.valueOf(loginIdByToken);
                 }
             } catch (Exception ignored) {
-                // ignore
+                // 忽略 token 反查异常，最终回退为匿名请求。
             }
         }
 
         return "anonymous";
-    }
-
-    private void persistAuditLog(String userId, String method, String uri, String clientIp, int status,
-                                 long durationMs, String traceId, Date requestTime, HttpServletRequest request) {
-        if (sysAuditLogService == null) {
-            return;
-        }
-        try {
-            SysAuditLog auditLog = new SysAuditLog();
-            auditLog.setUserId(parseLong(userId));
-            auditLog.setRequestMethod(method);
-            auditLog.setRequestUri(uri);
-            auditLog.setClientIp(clientIp);
-            auditLog.setUserAgent(truncate(request.getHeader("User-Agent"), 500));
-            auditLog.setHttpStatus(status);
-            auditLog.setDurationMs(durationMs);
-            auditLog.setTraceId(truncate(traceId, 64));
-            auditLog.setRequestTime(requestTime);
-            sysAuditLogService.save(auditLog);
-        } catch (Exception ignored) {
-            // 审计落库失败不影响主业务请求链路。
-        }
     }
 
     private Long parseLong(String value) {
@@ -188,7 +197,7 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                 tokenName = configuredTokenName.trim();
             }
         } catch (Exception ignored) {
-            // ignore
+            // 忽略配置读取异常，回退到默认请求头名称。
         }
 
         String tokenValue = request.getHeader(tokenName);

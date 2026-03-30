@@ -1,5 +1,10 @@
 # 政务项目后端说明
 
+## 架构文档
+- 后端专版架构说明：[`ARCHITECTURE_BACKEND.md`](./ARCHITECTURE_BACKEND.md)
+- 全项目总览（前后端）：[`../PROJECT_ARCHITECTURE.md`](../PROJECT_ARCHITECTURE.md)
+- 性能基线脚本与说明：[`docs/PERF_BASELINE.md`](./docs/PERF_BASELINE.md)
+
 ## 1. 项目定位
 该项目为政务项目管理系统后端，承担以下核心职责：
 - 登录鉴权与会话管理
