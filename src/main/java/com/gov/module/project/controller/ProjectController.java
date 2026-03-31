@@ -33,6 +33,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -52,6 +53,10 @@ public class ProjectController {
 
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
     private static final Pattern CONTACT_PHONE_PATTERN = Pattern.compile("^[0-9-]{7,20}$");
+    private static final BigDecimal LONGITUDE_MIN = new BigDecimal("-180");
+    private static final BigDecimal LONGITUDE_MAX = new BigDecimal("180");
+    private static final BigDecimal LATITUDE_MIN = new BigDecimal("-90");
+    private static final BigDecimal LATITUDE_MAX = new BigDecimal("90");
 
     @Autowired
     private BizProjectService bizProjectService;
@@ -715,6 +720,7 @@ public class ProjectController {
         if (payload == null) {
             return project;
         }
+        validateProjectCoordinates(payload.getLongitude(), payload.getLatitude());
         project.setProjectName(payload.getProjectName());
         project.setProjectCode(payload.getProjectCode());
         project.setAddress(payload.getAddress());
@@ -744,6 +750,7 @@ public class ProjectController {
         if (payload == null) {
             return project;
         }
+        validateProjectCoordinates(payload.getLongitude(), payload.getLatitude());
         project.setId(payload.getId());
         project.setProjectName(payload.getProjectName());
         project.setProjectCode(payload.getProjectCode());
@@ -774,6 +781,7 @@ public class ProjectController {
         if (payload == null) {
             return project;
         }
+        validateProjectCoordinates(payload.getLongitude(), payload.getLatitude());
         project.setId(payload.getId());
         project.setProjectName(payload.getProjectName());
         project.setProjectCode(payload.getProjectCode());
@@ -840,6 +848,20 @@ public class ProjectController {
      *
      * @return 当前访问上下文
      */
+    private void validateProjectCoordinates(BigDecimal longitude, BigDecimal latitude) {
+        validateCoordinateRange("经度", longitude, LONGITUDE_MIN, LONGITUDE_MAX);
+        validateCoordinateRange("纬度", latitude, LATITUDE_MIN, LATITUDE_MAX);
+    }
+
+    private void validateCoordinateRange(String label, BigDecimal value, BigDecimal min, BigDecimal max) {
+        if (value == null) {
+            return;
+        }
+        if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
+            throw new IllegalArgumentException(label + "范围应为 " + min.toPlainString() + " 到 " + max.toPlainString());
+        }
+    }
+
     private UserAccessContext currentAccessContext() {
         return sysUserService.getAccessContext(StpUtil.getLoginIdAsLong());
     }
