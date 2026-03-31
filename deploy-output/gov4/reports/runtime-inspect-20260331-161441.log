@@ -1,0 +1,506 @@
+Gov4 Runtime Inspection Report
+Generated At: 2026-03-31 16:14:41 CST
+Hostname: ecm-dde5
+Base Dir: /opt/gov4
+HTTP Port: 81
+
+============================================================
+Host Basic
+============================================================
+
+>>> uname -a
++ uname -a
+Linux ecm-dde5 4.19.90-89.11.v2401.ky10.aarch64 #1 SMP Thu Apr 25 18:20:10 CST 2024 aarch64 aarch64 aarch64 GNU/Linux
+
+>>> uptime
++ uptime
+ 16:14:41 up 4 days,  5:06,  3 users,  load average: 0.03, 0.05, 0.06
+
+>>> free -h
++ free -h
+              total        used        free      shared  buff/cache   available
+Mem:           15Gi       2.2Gi       7.3Gi       655Mi       5.9Gi        10Gi
+Swap:            0B          0B          0B
+
+>>> df -h
++ df -h
+Filesystem      Size  Used Avail Use% Mounted on
+devtmpfs        7.7G     0  7.7G   0% /dev
+tmpfs           7.7G     0  7.7G   0% /dev/shm
+tmpfs           7.7G  656M  7.1G   9% /run
+tmpfs           7.7G     0  7.7G   0% /sys/fs/cgroup
+/dev/vda2       200G  7.6G  193G   4% /
+tmpfs           7.7G  192K  7.7G   1% /tmp
+/dev/vda1       200M  7.0M  193M   4% /boot/efi
+tmpfs           1.6G     0  1.6G   0% /run/user/0
+overlay         200G  7.6G  193G   4% /var/lib/docker/overlay2/5b6b77747e11209110977841800495c1155404c4b3a9026c7f9c9aad953cc7f4/merged
+shm              64M     0   64M   0% /var/lib/docker/containers/7c5ccf95adab834c765d613f459b98364ce19640c921b11e5d660f3ed983423a/mounts/shm
+overlay         200G  7.6G  193G   4% /var/lib/docker/overlay2/cb5aacc8229d8ef3cf67609af05737db91b2e3da6639122575f83919222a628d/merged
+shm              64M     0   64M   0% /var/lib/docker/containers/3f4d213d05625005f30734f96c635a23baff78e11a37da848de3f88384e68da8/mounts/shm
+overlay         200G  7.6G  193G   4% /var/lib/docker/overlay2/30b8eac6ee21753e2dfbe11411835527c529b6e81075eec83a5b11359640548a/merged
+shm              64M     0   64M   0% /var/lib/docker/containers/9744784a22f1a0d560ac7af04bb188bbca1a61484c56ef3164b83778f6a18faf/mounts/shm
+overlay         200G  7.6G  193G   4% /var/lib/docker/overlay2/07097c62a2cc89fdfb88acf8e2e1c48ac1db4646a94db01cd40d1680816e90e7/merged
+shm              64M     0   64M   0% /var/lib/docker/containers/3353522dd75f99778675422af6be602373df58e411695cb3f0fb68b0c64849ad/mounts/shm
+
+>>> ip addr
++ ip addr
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+514: veth9ae4a53@if513: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-4d7333aa8fe5 state UP group default 
+    link/ether a6:94:7b:15:2e:0a brd ff:ff:ff:ff:ff:ff link-netnsid 0
+    inet6 fe80::a494:7bff:fe15:2e0a/64 scope link 
+       valid_lft forever preferred_lft forever
+2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    link/ether fa:16:3e:19:0b:e6 brd ff:ff:ff:ff:ff:ff
+    inet 10.0.0.3/24 brd 10.0.0.255 scope global dynamic noprefixroute eth0
+       valid_lft 314996022sec preferred_lft 314996022sec
+    inet6 fe80::7a61:322d:80dd:abcb/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+3: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default 
+    link/ether 02:42:80:ca:de:b0 brd ff:ff:ff:ff:ff:ff
+    inet 172.17.0.1/16 brd 172.17.255.255 scope global docker0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:80ff:feca:deb0/64 scope link 
+       valid_lft forever preferred_lft forever
+516: veth6901aa7@if515: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-4d7333aa8fe5 state UP group default 
+    link/ether a2:e3:c5:94:59:5b brd ff:ff:ff:ff:ff:ff link-netnsid 1
+    inet6 fe80::a0e3:c5ff:fe94:595b/64 scope link 
+       valid_lft forever preferred_lft forever
+4: br-4d7333aa8fe5: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UP group default 
+    link/ether 02:42:4f:80:72:24 brd ff:ff:ff:ff:ff:ff
+    inet 172.18.0.1/16 brd 172.18.255.255 scope global br-4d7333aa8fe5
+       valid_lft forever preferred_lft forever
+    inet6 fe80::42:4fff:fe80:7224/64 scope link 
+       valid_lft forever preferred_lft forever
+518: vethd093f7a@if517: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-4d7333aa8fe5 state UP group default 
+    link/ether 8e:6e:90:0f:9b:ae brd ff:ff:ff:ff:ff:ff link-netnsid 2
+    inet6 fe80::8c6e:90ff:fe0f:9bae/64 scope link 
+       valid_lft forever preferred_lft forever
+520: vethf797210@if519: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue master br-4d7333aa8fe5 state UP group default 
+    link/ether d6:a6:19:6d:0f:3a brd ff:ff:ff:ff:ff:ff link-netnsid 3
+    inet6 fe80::d4a6:19ff:fe6d:f3a/64 scope link 
+       valid_lft forever preferred_lft forever
+
+>>> ip route
++ ip route
+default via 10.0.0.1 dev eth0 proto dhcp metric 100 
+10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.3 metric 100 
+169.254.169.0/24 via 10.0.0.1 dev eth0 proto dhcp metric 100 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-4d7333aa8fe5 proto kernel scope link src 172.18.0.1 
+
+>>> ss -lntp
++ ss -lntp
+State     Recv-Q    Send-Q       Local Address:Port        Peer Address:Port    Process                                                                         
+LISTEN    0         128                0.0.0.0:22               0.0.0.0:*        users:(("sshd",pid=1474,fd=5))                                                 
+LISTEN    0         512              127.0.0.1:9001             0.0.0.0:*        users:(("docker-proxy",pid=220416,fd=4))                                       
+LISTEN    0         128                   [::]:22                  [::]:*        users:(("sshd",pid=1474,fd=6))                                                 
+LISTEN    0         512                      *:81                     *:*        users:(("docker-proxy",pid=220713,fd=4))                                       
+
+============================================================
+Host Runtime
+============================================================
+
+>>> vmstat 1 5
++ vmstat 1 5
+procs -----------memory---------- ---swap-- -----io---- -system-- ------cpu-----
+ r  b   swpd   free   buff  cache   si   so    bi    bo   in   cs us sy id wa st
+ 1  0      0 7626944   6144 6164544    0    0     0     8   22   25  1  0 98  0  0
+ 0  0      0 7637504   6144 6164736    0    0     0    76 1595 2896  1  1 98  0  0
+ 0  0      0 7637504   6144 6164736    0    0     0     0 1284 2522  0  0 100  0  0
+ 0  0      0 7648448   6144 6164736    0    0     0    70 1402 2699  0  0 100  0  0
+ 0  0      0 7640256   6144 6164736    0    0    16    34 1808 3305  3  1 96  0  0
+
+>>> iostat -x 1 3
++ iostat -x 1 3
+Linux 4.19.90-89.11.v2401.ky10.aarch64 (ecm-dde5) 	2026-03-31 	_aarch64_	(4 CPU)
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           1.28    0.01    0.49    0.00    0.00   98.22
+
+Device            r/s     rkB/s   rrqm/s  %rrqm r_await rareq-sz     w/s     wkB/s   wrqm/s  %wrqm w_await wareq-sz     d/s     dkB/s   drqm/s  %drqm d_await dareq-sz  aqu-sz  %util
+scd0             0.00      0.00     0.00   0.00    0.39    18.35    0.00      0.00     0.00   0.00    0.00     0.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00   0.00
+vda              0.03      1.18     0.00   0.38    1.36    42.36    0.75     33.58     0.21  21.74    3.14    44.70    0.00      0.00     0.00   0.00    0.00     0.00    0.00   0.23
+
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.75    0.00    0.75    0.00    0.00   98.49
+
+Device            r/s     rkB/s   rrqm/s  %rrqm r_await rareq-sz     w/s     wkB/s   wrqm/s  %wrqm w_await wareq-sz     d/s     dkB/s   drqm/s  %drqm d_await dareq-sz  aqu-sz  %util
+scd0             0.00      0.00     0.00   0.00    0.00     0.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00   0.00
+vda              0.00      0.00     0.00   0.00    0.00     0.00    2.00     16.50     0.00   0.00    2.00     8.25    0.00      0.00     0.00   0.00    0.00     0.00    0.00   1.00
+
+
+avg-cpu:  %user   %nice %system %iowait  %steal   %idle
+           0.00    0.00    0.00    0.00    0.00  100.00
+
+Device            r/s     rkB/s   rrqm/s  %rrqm r_await rareq-sz     w/s     wkB/s   wrqm/s  %wrqm w_await wareq-sz     d/s     dkB/s   drqm/s  %drqm d_await dareq-sz  aqu-sz  %util
+scd0             0.00      0.00     0.00   0.00    0.00     0.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00   0.00
+vda              0.00      0.00     0.00   0.00    0.00     0.00    1.00     28.00     1.00  50.00    2.00    28.00    0.00      0.00     0.00   0.00    0.00     0.00    0.00   1.00
+
+
+
+>>> top -b -n 1 | head -n 30
++ top -b -n 1 | head -n 30
+top - 16:14:48 up 4 days,  5:06,  3 users,  load average: 0.03, 0.05, 0.06
+Tasks: 426 total,   1 running, 425 sleeping,   0 stopped,   0 zombie
+%Cpu(s):  0.0 us,  4.2 sy,  0.0 ni, 95.8 id,  0.0 wa,  0.0 hi,  0.0 si,  0.0 st
+MiB Mem :  15751.2 total,   7459.2 free,   2265.7 used,   6026.3 buff/cache
+MiB Swap:      0.0 total,      0.0 free,      0.0 used.  10612.1 avail Mem 
+
+    PID USER      PR  NI    VIRT    RES    SHR S  %CPU  %MEM     TIME+ COMMAND
+ 224529 root      20   0  229120   7744   4032 R  11.8   0.0   0:00.03 top
+      1 root      20   0  111616  17216   8832 S   0.0   0.1   1:34.65 systemd
+      2 root      20   0       0      0      0 S   0.0   0.0   0:00.44 kthreadd
+      3 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_gp
+      4 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 rcu_par+
+      6 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker+
+      8 root      20   0       0      0      0 I   0.0   0.0   0:03.41 kworker+
+      9 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 mm_perc+
+     10 root      20   0       0      0      0 S   0.0   0.0   0:06.21 ksoftir+
+     11 root      20   0       0      0      0 I   0.0   0.0   0:31.60 rcu_sch+
+     12 root      20   0       0      0      0 I   0.0   0.0   0:00.00 rcu_bh
+     13 root      rt   0       0      0      0 S   0.0   0.0   0:00.45 migrati+
+     14 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/0
+     15 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/1
+     16 root      rt   0       0      0      0 S   0.0   0.0   0:00.43 migrati+
+     17 root      20   0       0      0      0 S   0.0   0.0   0:05.53 ksoftir+
+     19 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker+
+     20 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/2
+     21 root      rt   0       0      0      0 S   0.0   0.0   0:00.57 migrati+
+     22 root      20   0       0      0      0 S   0.0   0.0   0:05.18 ksoftir+
+     24 root       0 -20       0      0      0 I   0.0   0.0   0:00.00 kworker+
+     26 root      20   0       0      0      0 S   0.0   0.0   0:00.00 cpuhp/3
+     27 root      rt   0       0      0      0 S   0.0   0.0   0:00.56 migrati+
+
+============================================================
+Docker Overview
+============================================================
+
+>>> docker ps -a
++ docker ps -a
+CONTAINER ID        IMAGE                                                         COMMAND                   CREATED             STATUS              PORTS                                NAMES
+3353522dd75f        cr.kylinos.cn/basekylin/nginx:1.21.5-ky10sp3_2403             "nginx -g 'daemon of…"    About an hour ago   Up About an hour    0.0.0.0:81->81/tcp                   gov4-frontend
+9744784a22f1        cr.kylinos.cn/basekylin/java-openjdk-8-aarch64:1.8.0-v10sp1   "sh -c 'java ${JAVA_…"    About an hour ago   Up About an hour                                         gov4-backend
+3f4d213d0562        minio/minio:RELEASE.2023-08-09T23-30-22Z                      "/usr/bin/docker-ent…"    About an hour ago   Up About an hour    9000/tcp, 127.0.0.1:9001->9001/tcp   gov4-minio
+7c5ccf95adab        cr.kylinos.cn/basekylin/mariadb:10.3.39-ky10sp3_2403          "/bin/sh -c '\n    se…"   About an hour ago   Up About an hour                                         gov4-mariadb
+
+>>> docker stats --no-stream
++ docker stats --no-stream
+CONTAINER ID        NAME                CPU %               MEM USAGE / LIMIT     MEM %               NET I/O             BLOCK I/O           PIDS
+3353522dd75f        gov4-frontend       0.00%               17.62MiB / 15.38GiB   0.11%               3.34MB / 12.1MB     0B / 0B             5
+9744784a22f1        gov4-backend        1.15%               1.13GiB / 15.38GiB    7.35%               4.24MB / 1.49MB     0B / 0B             44
+3f4d213d0562        gov4-minio          0.03%               101.7MiB / 15.38GiB   0.65%               16.3kB / 7.91kB     1.39MB / 7.74MB     10
+7c5ccf95adab        gov4-mariadb        0.06%               105.6MiB / 15.38GiB   0.67%               1.14MB / 1.52MB     0B / 537MB          40
+
+>>> docker network ls
++ docker network ls
+NETWORK ID          NAME                DRIVER              SCOPE
+d54b87d8bba1        bridge              bridge              local
+4d7333aa8fe5        gov4-net            bridge              local
+dfdafef63189        host                host                local
+8b8e3a20042a        none                null                local
+
+============================================================
+Container Inspect
+============================================================
+
+--- gov4-frontend ---
+
+>>> docker inspect gov4-frontend
++ docker inspect gov4-frontend --format '{{json .State}} {{json .HostConfig.RestartPolicy}} {{json .NetworkSettings.Networks}}'
+{"Status":"running","Running":true,"Paused":false,"Restarting":false,"OOMKilled":false,"Dead":false,"Pid":220736,"ExitCode":0,"Error":"","StartedAt":"2026-03-31T06:48:48.004953583Z","FinishedAt":"0001-01-01T00:00:00Z"} {"Name":"unless-stopped","MaximumRetryCount":0} {"gov4-net":{"IPAMConfig":null,"Links":null,"Aliases":["3353522dd75f"],"NetworkID":"4d7333aa8fe5c254b7469ef5382fa978fccc4fcb7154c6ee077cc43a0a68d132","EndpointID":"f7aac1dcec7ab7489bfac5161483d6070cb1fe33f220d7e035f02147c0f244a9","Gateway":"172.18.0.1","IPAddress":"172.18.0.5","IPPrefixLen":16,"IPv6Gateway":"","GlobalIPv6Address":"","GlobalIPv6PrefixLen":0,"MacAddress":"02:42:ac:12:00:05","DriverOpts":null}}
+
+>>> docker logs --tail 120 gov4-frontend
++ docker logs --tail 120 gov4-frontend
+
+--- gov4-backend ---
+
+>>> docker inspect gov4-backend
++ docker inspect gov4-backend --format '{{json .State}} {{json .HostConfig.RestartPolicy}} {{json .NetworkSettings.Networks}}'
+{"Status":"running","Running":true,"Paused":false,"Restarting":false,"OOMKilled":false,"Dead":false,"Pid":220550,"ExitCode":0,"Error":"","StartedAt":"2026-03-31T06:48:46.461673742Z","FinishedAt":"0001-01-01T00:00:00Z"} {"Name":"unless-stopped","MaximumRetryCount":0} {"gov4-net":{"IPAMConfig":null,"Links":null,"Aliases":["9744784a22f1"],"NetworkID":"4d7333aa8fe5c254b7469ef5382fa978fccc4fcb7154c6ee077cc43a0a68d132","EndpointID":"872877ea54aad8e5da5e47dae69deae5455c9efc0db6239f573c71b78f317833","Gateway":"172.18.0.1","IPAddress":"172.18.0.4","IPPrefixLen":16,"IPv6Gateway":"","GlobalIPv6Address":"","GlobalIPv6PrefixLen":0,"MacAddress":"02:42:ac:12:00:04","DriverOpts":null}}
+
+>>> docker logs --tail 120 gov4-backend
++ docker logs --tail 120 gov4-backend
+	at org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(InvocableHandlerMethod.java:205)
+	at org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(InvocableHandlerMethod.java:150)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:117)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:895)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(RequestMappingHandlerAdapter.java:808)
+	at org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(AbstractHandlerMethodAdapter.java:87)
+	at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1072)
+	at org.springframework.web.servlet.DispatcherServlet.doService(DispatcherServlet.java:965)
+	at org.springframework.web.servlet.FrameworkServlet.processRequest(FrameworkServlet.java:1006)
+	at org.springframework.web.servlet.FrameworkServlet.doPost(FrameworkServlet.java:909)
+	at javax.servlet.http.HttpServlet.service(HttpServlet.java:555)
+	at org.springframework.web.servlet.FrameworkServlet.service(FrameworkServlet.java:883)
+	at javax.servlet.http.HttpServlet.service(HttpServlet.java:623)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:209)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at org.apache.tomcat.websocket.server.WsFilter.doFilter(WsFilter.java:51)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at org.springframework.web.filter.RequestContextFilter.doFilterInternal(RequestContextFilter.java:100)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:117)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at cn.dev33.satoken.filter.SaPathCheckFilterForServlet.doFilter(SaPathCheckFilterForServlet.java:55)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at org.springframework.web.filter.FormContentFilter.doFilterInternal(FormContentFilter.java:93)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:117)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at com.gov.common.filter.AuditAccessFilter.doFilterInternal(AuditAccessFilter.java:66)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:117)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(CharacterEncodingFilter.java:201)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:117)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at com.gov.common.filter.TraceIdFilter.doFilterInternal(TraceIdFilter.java:35)
+	at org.springframework.web.filter.OncePerRequestFilter.doFilter(OncePerRequestFilter.java:117)
+	at org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(ApplicationFilterChain.java:178)
+	at org.apache.catalina.core.ApplicationFilterChain.doFilter(ApplicationFilterChain.java:153)
+	at org.apache.catalina.core.StandardWrapperValve.invoke(StandardWrapperValve.java:168)
+	at org.apache.catalina.core.StandardContextValve.invoke(StandardContextValve.java:90)
+	at org.apache.catalina.authenticator.AuthenticatorBase.invoke(AuthenticatorBase.java:481)
+	at org.apache.catalina.core.StandardHostValve.invoke(StandardHostValve.java:130)
+	at org.apache.catalina.valves.ErrorReportValve.invoke(ErrorReportValve.java:93)
+	at org.apache.catalina.core.StandardEngineValve.invoke(StandardEngineValve.java:74)
+	at org.apache.catalina.connector.CoyoteAdapter.service(CoyoteAdapter.java:342)
+	at org.apache.coyote.http11.Http11Processor.service(Http11Processor.java:390)
+	at org.apache.coyote.AbstractProcessorLight.process(AbstractProcessorLight.java:63)
+	at org.apache.coyote.AbstractProtocol$ConnectionHandler.process(AbstractProtocol.java:928)
+	at org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(NioEndpoint.java:1794)
+	at org.apache.tomcat.util.net.SocketProcessorBase.run(SocketProcessorBase.java:52)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1191)
+	at org.apache.tomcat.util.threads.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:659)
+	at org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(TaskThread.java:61)
+	at java.lang.Thread.run(Thread.java:748)
+Caused by: java.sql.SQLSyntaxErrorException: (conn=27) Out of range value for column 'longitude' at row 1
+	at org.mariadb.jdbc.export.ExceptionFactory.createException(ExceptionFactory.java:282)
+	at org.mariadb.jdbc.export.ExceptionFactory.create(ExceptionFactory.java:370)
+	at org.mariadb.jdbc.message.ClientMessage.readPacket(ClientMessage.java:134)
+	at org.mariadb.jdbc.client.impl.StandardClient.readPacket(StandardClient.java:872)
+	at org.mariadb.jdbc.client.impl.StandardClient.readResults(StandardClient.java:811)
+	at org.mariadb.jdbc.client.impl.StandardClient.readResponse(StandardClient.java:730)
+	at org.mariadb.jdbc.client.impl.StandardClient.execute(StandardClient.java:654)
+	at org.mariadb.jdbc.ClientPreparedStatement.executeInternal(ClientPreparedStatement.java:95)
+	at org.mariadb.jdbc.ClientPreparedStatement.execute(ClientPreparedStatement.java:268)
+	at com.zaxxer.hikari.pool.ProxyPreparedStatement.execute(ProxyPreparedStatement.java:44)
+	at com.zaxxer.hikari.pool.HikariProxyPreparedStatement.execute(HikariProxyPreparedStatement.java)
+	at org.apache.ibatis.executor.statement.PreparedStatementHandler.update(PreparedStatementHandler.java:47)
+	at org.apache.ibatis.executor.statement.RoutingStatementHandler.update(RoutingStatementHandler.java:74)
+	at sun.reflect.GeneratedMethodAccessor65.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.ibatis.plugin.Plugin.invoke(Plugin.java:64)
+	at com.sun.proxy.$Proxy140.update(Unknown Source)
+	at org.apache.ibatis.executor.SimpleExecutor.doUpdate(SimpleExecutor.java:50)
+	at org.apache.ibatis.executor.BaseExecutor.update(BaseExecutor.java:117)
+	at org.apache.ibatis.executor.CachingExecutor.update(CachingExecutor.java:76)
+	at sun.reflect.GeneratedMethodAccessor60.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.apache.ibatis.plugin.Invocation.proceed(Invocation.java:49)
+	at com.baomidou.mybatisplus.extension.plugins.MybatisPlusInterceptor.intercept(MybatisPlusInterceptor.java:106)
+	at org.apache.ibatis.plugin.Plugin.invoke(Plugin.java:62)
+	at com.sun.proxy.$Proxy139.update(Unknown Source)
+	at org.apache.ibatis.session.defaults.DefaultSqlSession.update(DefaultSqlSession.java:194)
+	at org.apache.ibatis.session.defaults.DefaultSqlSession.insert(DefaultSqlSession.java:181)
+	at sun.reflect.GeneratedMethodAccessor66.invoke(Unknown Source)
+	at sun.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.lang.reflect.Method.invoke(Method.java:498)
+	at org.mybatis.spring.SqlSessionTemplate$SqlSessionInterceptor.invoke(SqlSessionTemplate.java:427)
+	... 82 common frames omitted
+2026-03-31 15:45:04.065 [http-nio-8080-exec-8] INFO  [19d42da6baa14bd412e56beee19] com.gov.audit - method=POST, uri=/api/project/add, userId=1, ip=222.90.75.34, status=200, durationMs=28
+2026-03-31 15:45:04.065 [http-nio-8080-exec-8] INFO  [19d42da6baa14bd412e56beee19] com.gov.perf - audit_enqueue_perf method=POST uri=/api/project/add userId=1 enqueued=true enqueueMs=0 totalDurationMs=28 traceId=19d42da6baa14bd412e56beee19
+2026-03-31 15:45:09.088 [http-nio-8080-exec-9] INFO  [19d42da7f67eb8919aaa8babe27] com.gov.perf - action=frontendMonitorReport userId=1 count=2 durationMs=12
+2026-03-31 15:45:31.658 [http-nio-8080-exec-1] INFO  [19d42dad78bd0698c365cdc6253] com.gov.perf - 项目分页查询完成 userId=1 pageNum=1 pageSize=10 total=3 records=3 durationMs=21
+2026-03-31 15:45:31.660 [http-nio-8080-exec-1] INFO  [19d42dad78bd0698c365cdc6253] com.gov.audit - method=GET, uri=/api/project/page, userId=1, ip=222.90.75.34, status=200, durationMs=25
+2026-03-31 15:45:31.661 [http-nio-8080-exec-1] INFO  [19d42dad78bd0698c365cdc6253] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/page userId=1 enqueued=true enqueueMs=0 totalDurationMs=25 traceId=19d42dad78bd0698c365cdc6253
+2026-03-31 15:45:35.099 [http-nio-8080-exec-10] INFO  [19d42dae4ffbcb3821f59240c02] com.gov.perf - 项目分页查询完成 userId=1 pageNum=1 pageSize=10 total=0 records=0 durationMs=17
+2026-03-31 15:45:35.101 [http-nio-8080-exec-10] INFO  [19d42dae4ffbcb3821f59240c02] com.gov.audit - method=GET, uri=/api/project/page, userId=1, ip=222.90.75.34, status=200, durationMs=21
+2026-03-31 15:45:35.102 [http-nio-8080-exec-10] INFO  [19d42dae4ffbcb3821f59240c02] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/page userId=1 enqueued=true enqueueMs=1 totalDurationMs=21 traceId=19d42dae4ffbcb3821f59240c02
+2026-03-31 15:45:40.058 [http-nio-8080-exec-2] INFO  [19d42daf85cd608d1943fdaba99] com.gov.perf - 项目分页查询完成 userId=1 pageNum=1 pageSize=10 total=3 records=3 durationMs=19
+2026-03-31 15:45:40.061 [http-nio-8080-exec-2] INFO  [19d42daf85cd608d1943fdaba99] com.gov.audit - method=GET, uri=/api/project/page, userId=1, ip=222.90.75.34, status=200, durationMs=25
+2026-03-31 15:45:40.061 [http-nio-8080-exec-2] INFO  [19d42daf85cd608d1943fdaba99] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/page userId=1 enqueued=true enqueueMs=0 totalDurationMs=25 traceId=19d42daf85cd608d1943fdaba99
+2026-03-31 15:45:55.004 [http-nio-8080-exec-4] INFO  [19d42db32c46b7c31fd5bff03e1] com.gov.perf - map_summary_perf userId=1 level=city scopeMode=0 province=陕西省 city=null district=null allowed=true count=2 validationMs=0 scopeResolveMs=10 queryMs=4 totalMs=14
+2026-03-31 15:45:55.004 [http-nio-8080-exec-4] INFO  [19d42db32c46b7c31fd5bff03e1] com.gov.perf - 地图汇总查询完成 userId=1 level=city province=陕西省 city=null district=null count=2 durationMs=14
+2026-03-31 15:45:55.006 [http-nio-8080-exec-4] INFO  [19d42db32c46b7c31fd5bff03e1] com.gov.audit - method=GET, uri=/api/project/map/summary, userId=1, ip=222.90.75.34, status=200, durationMs=18
+2026-03-31 15:45:55.007 [http-nio-8080-exec-4] INFO  [19d42db32c46b7c31fd5bff03e1] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/map/summary userId=1 enqueued=true enqueueMs=1 totalDurationMs=18 traceId=19d42db32c46b7c31fd5bff03e1
+2026-03-31 15:45:59.083 [http-nio-8080-exec-3] INFO  [19d42db42b74d9334099ff95947] com.gov.perf - action=frontendMonitorReport userId=1 count=5 durationMs=11
+2026-03-31 15:46:04.262 [http-nio-8080-exec-6] INFO  [19d42db56f00b3ae5a2c3b62b71] com.gov.perf - map_summary_perf userId=1 level=district scopeMode=0 province=陕西省 city=西安市 district=null allowed=true count=1 validationMs=0 scopeResolveMs=11 queryMs=1 totalMs=12
+2026-03-31 15:46:04.263 [http-nio-8080-exec-6] INFO  [19d42db56f00b3ae5a2c3b62b71] com.gov.perf - 地图汇总查询完成 userId=1 level=district province=陕西省 city=西安市 district=null count=1 durationMs=13
+2026-03-31 15:46:04.265 [http-nio-8080-exec-6] INFO  [19d42db56f00b3ae5a2c3b62b71] com.gov.audit - method=GET, uri=/api/project/map/summary, userId=1, ip=222.90.75.34, status=200, durationMs=16
+2026-03-31 15:46:04.265 [http-nio-8080-exec-6] INFO  [19d42db56f00b3ae5a2c3b62b71] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/map/summary userId=1 enqueued=true enqueueMs=0 totalDurationMs=16 traceId=19d42db56f00b3ae5a2c3b62b71
+2026-03-31 15:46:06.319 [http-nio-8080-exec-5] INFO  [19d42db5ef9d5c7672b5a7b0fb2] com.gov.perf - map_list_perf userId=1 scopeMode=0 province=陕西省 city=西安市 district=雁塔区 allowed=true count=2 scopeResolveMs=11 queryMs=2 totalMs=13
+2026-03-31 15:46:06.319 [http-nio-8080-exec-5] INFO  [19d42db5ef9d5c7672b5a7b0fb2] com.gov.perf - 项目地图点位查询完成 userId=1 province=陕西省 city=西安市 district=雁塔区 count=2 durationMs=14
+2026-03-31 15:46:06.321 [http-nio-8080-exec-5] INFO  [19d42db5ef9d5c7672b5a7b0fb2] com.gov.audit - method=GET, uri=/api/project/map/list, userId=1, ip=222.90.75.34, status=200, durationMs=17
+2026-03-31 15:46:06.321 [http-nio-8080-exec-5] INFO  [19d42db5ef9d5c7672b5a7b0fb2] com.gov.perf - audit_enqueue_perf method=GET uri=/api/project/map/list userId=1 enqueued=true enqueueMs=0 totalDurationMs=17 traceId=19d42db5ef9d5c7672b5a7b0fb2
+2026-03-31 15:46:09.085 [http-nio-8080-exec-7] INFO  [19d42db69c80121bb2ca32fa0a6] com.gov.perf - action=frontendMonitorReport userId=1 count=8 durationMs=10
+2026-03-31 15:46:19.085 [http-nio-8080-exec-8] INFO  [19d42db90d908eadd4e841cf1aa] com.gov.perf - action=frontendMonitorReport userId=1 count=6 durationMs=12
+
+--- gov4-minio ---
+
+>>> docker inspect gov4-minio
++ docker inspect gov4-minio --format '{{json .State}} {{json .HostConfig.RestartPolicy}} {{json .NetworkSettings.Networks}}'
+{"Status":"running","Running":true,"Paused":false,"Restarting":false,"OOMKilled":false,"Dead":false,"Pid":220440,"ExitCode":0,"Error":"","StartedAt":"2026-03-31T06:48:45.372669379Z","FinishedAt":"0001-01-01T00:00:00Z"} {"Name":"unless-stopped","MaximumRetryCount":0} {"gov4-net":{"IPAMConfig":null,"Links":null,"Aliases":["3f4d213d0562"],"NetworkID":"4d7333aa8fe5c254b7469ef5382fa978fccc4fcb7154c6ee077cc43a0a68d132","EndpointID":"19272d838e1322a4e7f5a277b9484f613a086e33f019119b4df159d43c83f640","Gateway":"172.18.0.1","IPAddress":"172.18.0.3","IPPrefixLen":16,"IPv6Gateway":"","GlobalIPv6Address":"","GlobalIPv6PrefixLen":0,"MacAddress":"02:42:ac:12:00:03","DriverOpts":null}}
+
+>>> docker logs --tail 120 gov4-minio
++ docker logs --tail 120 gov4-minio
+Formatting 1st pool, 1 set(s), 1 drives per set.
+WARNING: Host local has more than 0 drives of set. A host failure will result in data becoming unavailable.
+MinIO Object Storage Server
+Copyright: 2015-2023 MinIO, Inc.
+License: GNU AGPLv3 <https://www.gnu.org/licenses/agpl-3.0.html>
+Version: RELEASE.2023-08-09T23-30-22Z (go1.19.12 linux/arm64)
+
+Status:         1 Online, 0 Offline. 
+S3-API: http://172.18.0.3:9000  http://127.0.0.1:9000 
+Console: http://172.18.0.3:9001 http://127.0.0.1:9001 
+
+Documentation: https://min.io/docs/minio/linux/index.html
+Warning: The standard parity is set to 0. This can lead to data loss.
+
+ You are running an older version of MinIO released 2 years before the latest release 
+ Update: Run `mc admin update` 
+
+
+
+--- gov4-mariadb ---
+
+>>> docker inspect gov4-mariadb
++ docker inspect gov4-mariadb --format '{{json .State}} {{json .HostConfig.RestartPolicy}} {{json .NetworkSettings.Networks}}'
+{"Status":"running","Running":true,"Paused":false,"Restarting":false,"OOMKilled":false,"Dead":false,"Pid":219741,"ExitCode":0,"Error":"","StartedAt":"2026-03-31T06:48:38.107132325Z","FinishedAt":"0001-01-01T00:00:00Z"} {"Name":"unless-stopped","MaximumRetryCount":0} {"gov4-net":{"IPAMConfig":null,"Links":null,"Aliases":["7c5ccf95adab"],"NetworkID":"4d7333aa8fe5c254b7469ef5382fa978fccc4fcb7154c6ee077cc43a0a68d132","EndpointID":"3306fcce1ac9126157812bd3927fa79c071df07a21d9004e0f1575f513c49046","Gateway":"172.18.0.1","IPAddress":"172.18.0.2","IPPrefixLen":16,"IPv6Gateway":"","GlobalIPv6Address":"","GlobalIPv6PrefixLen":0,"MacAddress":"02:42:ac:12:00:02","DriverOpts":null}}
+
+>>> docker logs --tail 120 gov4-mariadb
++ docker logs --tail 120 gov4-mariadb
+/usr/bin/mysql_install_db: line 419: hostname: command not found
+WARNING: The host '' could not be looked up with /usr/bin/resolveip.
+This probably means that your libc libraries are not 100 % compatible
+with this binary MariaDB version. The MariaDB daemon, mysqld, should work
+normally with the exception that host name resolving will not work.
+This means that you should use IP addresses instead of hostnames
+when specifying MariaDB privileges !
+Installing MariaDB/MySQL system tables in '/var/lib/mysql' ...
+OK
+
+To start mysqld at boot time you have to copy
+support-files/mysql.server to the right place for your system
+
+
+PLEASE REMEMBER TO SET A PASSWORD FOR THE MariaDB root USER !
+To do so, start the server, then issue the following command:
+
+'/usr/bin/mysql_secure_installation'
+
+which will also give you the option of removing the test
+databases and anonymous user created by default.  This is
+strongly recommended for production servers.
+
+See the MariaDB Knowledgebase at http://mariadb.com/kb
+
+You can start the MariaDB daemon with:
+cd '/usr' ; /usr/bin/mysqld_safe --datadir='/var/lib/mysql'
+
+You can test the MariaDB daemon with mysql-test-run.pl
+cd '/usr/mysql-test' ; perl mysql-test-run.pl
+
+Please report any problems at http://mariadb.org/jira
+
+The latest information about MariaDB is available at http://mariadb.org/.
+
+Consider joining MariaDB's strong and vibrant community:
+https://mariadb.org/get-involved/
+
+2026-03-31 14:48:41 0 [Note] Starting MariaDB 10.3.39-MariaDB source revision ca001cf2048f0152689e1895e2dc15486dd0b1af as process 1
+2026-03-31 14:48:41 0 [Note] InnoDB: Using Linux native AIO
+2026-03-31 14:48:41 0 [Note] InnoDB: Mutexes and rw_locks use GCC atomic builtins
+2026-03-31 14:48:41 0 [Note] InnoDB: Uses event mutexes
+2026-03-31 14:48:41 0 [Note] InnoDB: Compressed tables use zlib 1.2.11
+2026-03-31 14:48:41 0 [Note] InnoDB: Number of pools: 1
+2026-03-31 14:48:41 0 [Note] InnoDB: Using generic crc32 instructions
+2026-03-31 14:48:41 0 [Note] InnoDB: Initializing buffer pool, total size = 128M, instances = 1, chunk size = 128M
+2026-03-31 14:48:41 0 [Note] InnoDB: Completed initialization of buffer pool
+2026-03-31 14:48:41 0 [Note] InnoDB: If the mysqld execution user is authorized, page cleaner thread priority can be changed. See the man page of setpriority().
+2026-03-31 14:48:41 0 [Note] InnoDB: 128 out of 128 rollback segments are active.
+2026-03-31 14:48:41 0 [Note] InnoDB: Creating shared tablespace for temporary tables
+2026-03-31 14:48:41 0 [Note] InnoDB: Setting file './ibtmp1' size to 12 MB. Physically writing the file full; Please wait ...
+2026-03-31 14:48:41 0 [Note] InnoDB: File './ibtmp1' size is now 12 MB.
+2026-03-31 14:48:41 0 [Note] InnoDB: Waiting for purge to start
+2026-03-31 14:48:41 0 [Note] InnoDB: 10.3.39 started; log sequence number 1625419; transaction id 20
+2026-03-31 14:48:41 0 [Note] InnoDB: Loading buffer pool(s) from /var/lib/mysql/ib_buffer_pool
+2026-03-31 14:48:41 0 [Note] InnoDB: Buffer pool(s) load completed at 260331 14:48:41
+2026-03-31 14:48:41 0 [Note] Plugin 'FEEDBACK' is disabled.
+2026-03-31 14:48:41 0 [Note] Server socket created on IP: '::'.
+2026-03-31 14:48:41 0 [Note] Reading of all Master_info entries succeeded
+2026-03-31 14:48:41 0 [Note] Added new Master_info '' to hash table
+2026-03-31 14:48:41 0 [Note] /usr/libexec/mysqld: ready for connections.
+Version: '10.3.39-MariaDB'  socket: '/run/mysqld/mysqld.sock'  port: 3306  MariaDB Server
+2026-03-31 14:48:42 8 [Warning] Access denied for user 'root'@'localhost' (using password: YES)
+2026-03-31 14:48:43 10 [Warning] Access denied for user 'root'@'localhost' (using password: YES)
+
+============================================================
+HTTP Checks
+============================================================
+
+>>> curl home
++ curl -I -sS --connect-timeout 5 http://127.0.0.1:81/
+HTTP/1.1 200 OK
+Server: nginx/1.21.5
+Date: Tue, 31 Mar 2026 08:14:51 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 1487
+Last-Modified: Tue, 31 Mar 2026 06:47:54 GMT
+Connection: keep-alive
+ETag: "69cb6e1a-5cf"
+Accept-Ranges: bytes
+
+
+>>> curl api doc
++ curl -I -sS --connect-timeout 5 http://127.0.0.1:81/api/doc.html
+HTTP/1.1 200 
+Server: nginx/1.21.5
+Date: Tue, 31 Mar 2026 08:14:51 GMT
+Content-Type: text/html; charset=utf-8
+Content-Length: 1766
+Connection: keep-alive
+X-Trace-Id: aca87ca980dc44d091e83472f266f9fa
+Vary: Origin
+Vary: Access-Control-Request-Method
+Vary: Access-Control-Request-Headers
+Last-Modified: Tue, 31 Mar 2026 06:47:53 GMT
+Accept-Ranges: bytes
+
+
+>>> curl home timing
++ curl -o /dev/null -sS -w 'home total=%{time_total}s code=%{http_code}\n' --connect-timeout 5 http://127.0.0.1:81/
+home total=0.001434s code=200
+
+>>> curl api doc timing
++ curl -o /dev/null -sS -w 'doc total=%{time_total}s code=%{http_code}\n' --connect-timeout 5 http://127.0.0.1:81/api/doc.html
+doc total=0.009866s code=200
+
+============================================================
+Backend JVM
+============================================================
+
+>>> backend java process
++ docker exec gov4-backend /bin/sh -c 'ps -ef | grep java | grep -v grep'
+root           1       0  3 14:48 ?        00:03:25 java -Xms2g -Xmx8g -Dfile.encoding=UTF-8 -jar /app/app.jar
+
+>>> backend java flags
++ docker exec gov4-backend /bin/sh -c 'tr "\0" " " < /proc/1/cmdline'
+java -Xms2g -Xmx8g -Dfile.encoding=UTF-8 -jar /app/app.jar 
+>>> backend memory
++ docker exec gov4-backend /bin/sh -c 'cat /proc/1/status | grep -E "VmRSS|VmSize|Threads"'
+VmSize:	12194560 kB
+VmRSS:	 1230208 kB
+Threads:	44

@@ -75,6 +75,7 @@ $deployScripts = @(
     'run-minio.sh',
     'run-backend.sh',
     'run-frontend.sh',
+    'inspect-runtime.sh',
     'deploy-all.sh',
     'README.md'
 )
