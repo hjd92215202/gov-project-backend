@@ -152,11 +152,3 @@ VALUES (1, 0, '综合部门');
 
 INSERT INTO sys_user (id, dept_id, username, password, real_name, status, deleted)
 VALUES (1, 1, 'admin', '66d7edc85a32d756ffef0046a56cf78060276b6beb3f02de7916c01ad54ea6b0', '超级管理员', 1, 0);
-
-INSERT INTO biz_project (
-    id, project_name, project_code, address, province, city, district,
-    longitude, latitude, leader_name, leader_phone, status, creator_id, creator_dept_id
-)
-VALUES
-    (2, '西安市莲湖区老旧改造工程', 'GC-002', '陕西省西安市莲湖区XX路', '陕西省', '西安市', '莲湖区', 108.9100000, 34.2700000, '李四', '13911112222', 1, 1, 1),
-    (3, '咸阳市某桥梁项目', 'GC-003', '陕西省咸阳市秦都区YY路', '陕西省', '咸阳市', '秦都区', 108.7000000, 34.3300000, '王五', '13566667777', 1, 1, 1);

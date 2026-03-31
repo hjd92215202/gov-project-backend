@@ -56,28 +56,28 @@ public class SchemaPatchRunner implements CommandLineRunner {
                 + ")");
 
         safeExec("ALTER TABLE sys_user MODIFY phone VARCHAR(255) DEFAULT NULL COMMENT '手机号（数据库中为密文）'");
-        safeExec("CREATE INDEX idx_sys_user_username ON sys_user(username)");
-        safeExec("CREATE INDEX idx_sys_user_dept_status ON sys_user(dept_id, status)");
-        safeExec("CREATE INDEX idx_sys_user_role_user_id ON sys_user_role(user_id)");
-        safeExec("CREATE INDEX idx_sys_user_role_role_id ON sys_user_role(role_id)");
-        safeExec("CREATE INDEX idx_sys_role_role_code ON sys_role(role_code)");
-        safeExec("CREATE INDEX idx_sys_dept_parent_id ON sys_dept(parent_id)");
-        safeExec("CREATE INDEX idx_sys_dept_leader_id ON sys_dept(leader_id)");
-        safeExec("CREATE INDEX idx_biz_project_creator_status_time ON biz_project(creator_id, status, create_time)");
-        safeExec("CREATE INDEX idx_biz_project_creator_dept_status_time ON biz_project(creator_dept_id, status, create_time)");
-        safeExec("CREATE INDEX idx_biz_project_status_region ON biz_project(status, province, city, district)");
-        safeExec("CREATE INDEX idx_biz_project_status_deleted_region ON biz_project(status, deleted, province, city, district)");
-        safeExec("CREATE INDEX idx_biz_project_status_deleted_creator_region ON biz_project(status, deleted, creator_id, province, city, district)");
-        safeExec("CREATE INDEX idx_biz_project_status_deleted_dept_region ON biz_project(status, deleted, creator_dept_id, province, city, district)");
-        safeExec("CREATE INDEX idx_sys_audit_log_time ON sys_audit_log(request_time)");
-        safeExec("CREATE INDEX idx_sys_audit_log_user_time ON sys_audit_log(user_id, request_time)");
-        safeExec("CREATE INDEX idx_sys_audit_log_uri_time ON sys_audit_log(request_uri, request_time)");
-        safeExec("CREATE INDEX idx_sys_audit_log_method_time ON sys_audit_log(request_method, request_time)");
-        safeExec("CREATE INDEX idx_sys_frontend_log_time ON sys_frontend_log(created_time)");
-        safeExec("CREATE INDEX idx_sys_frontend_log_user_time ON sys_frontend_log(user_id, created_time)");
-        safeExec("CREATE INDEX idx_sys_frontend_log_level_time ON sys_frontend_log(log_level, created_time)");
-        safeExec("CREATE INDEX idx_sys_frontend_log_type_time ON sys_frontend_log(log_type, created_time)");
-        safeExec("CREATE INDEX idx_sys_frontend_log_trace_id ON sys_frontend_log(trace_id)");
+        ensureIndex("sys_user", "idx_sys_user_username", "username");
+        ensureIndex("sys_user", "idx_sys_user_dept_status", "dept_id, status");
+        ensureIndex("sys_user_role", "idx_sys_user_role_user_id", "user_id");
+        ensureIndex("sys_user_role", "idx_sys_user_role_role_id", "role_id");
+        ensureIndex("sys_role", "idx_sys_role_role_code", "role_code");
+        ensureIndex("sys_dept", "idx_sys_dept_parent_id", "parent_id");
+        ensureIndex("sys_dept", "idx_sys_dept_leader_id", "leader_id");
+        ensureIndex("biz_project", "idx_biz_project_creator_status_time", "creator_id, status, create_time");
+        ensureIndex("biz_project", "idx_biz_project_creator_dept_status_time", "creator_dept_id, status, create_time");
+        ensureIndex("biz_project", "idx_biz_project_status_region", "status, province, city, district");
+        ensureIndex("biz_project", "idx_biz_project_status_deleted_region", "status, deleted, province, city, district");
+        ensureIndex("biz_project", "idx_biz_project_status_deleted_creator_region", "status, deleted, creator_id, province, city, district");
+        ensureIndex("biz_project", "idx_biz_project_status_deleted_dept_region", "status, deleted, creator_dept_id, province, city, district");
+        ensureIndex("sys_audit_log", "idx_sys_audit_log_time", "request_time");
+        ensureIndex("sys_audit_log", "idx_sys_audit_log_user_time", "user_id, request_time");
+        ensureIndex("sys_audit_log", "idx_sys_audit_log_uri_time", "request_uri, request_time");
+        ensureIndex("sys_audit_log", "idx_sys_audit_log_method_time", "request_method, request_time");
+        ensureIndex("sys_frontend_log", "idx_sys_frontend_log_time", "created_time");
+        ensureIndex("sys_frontend_log", "idx_sys_frontend_log_user_time", "user_id, created_time");
+        ensureIndex("sys_frontend_log", "idx_sys_frontend_log_level_time", "log_level, created_time");
+        ensureIndex("sys_frontend_log", "idx_sys_frontend_log_type_time", "log_type, created_time");
+        ensureIndex("sys_frontend_log", "idx_sys_frontend_log_trace_id", "trace_id");
 
         safeExec("UPDATE sys_role SET menu_perms = "
                 + "'dashboard:view,project:manage,project:engineering,system:user,system:dept,system:role,system:audit,system:frontend-monitor' "
@@ -89,6 +89,9 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("UPDATE sys_role SET menu_perms = CONCAT(menu_perms, ',system:frontend-monitor') "
                 + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
                 + "AND menu_perms NOT LIKE '%system:frontend-monitor%'");
+        safeExec("DELETE FROM biz_project WHERE "
+                + "(id = 2 AND project_code = 'GC-002' AND project_name = '西安市莲湖区老旧改造工程') "
+                + "OR (id = 3 AND project_code = 'GC-003' AND project_name = '咸阳市某桥梁项目')");
     }
 
     /**
@@ -100,6 +103,32 @@ public class SchemaPatchRunner implements CommandLineRunner {
     private void safeExec(String sql) {
         try {
             jdbcTemplate.execute(sql);
+        } catch (Exception ignored) {
+            // 启动补丁失败时静默忽略，避免阻塞应用启动。
+        }
+    }
+
+    /**
+     * 幂等补齐索引。
+     * 先查 information_schema，只有索引缺失时才创建，避免每次启动都刷重复索引警告。
+     *
+     * @param tableName 表名
+     * @param indexName 索引名
+     * @param columns   索引字段列表
+     */
+    private void ensureIndex(String tableName, String indexName, String columns) {
+        try {
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(1) FROM information_schema.statistics "
+                            + "WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?",
+                    Integer.class,
+                    tableName,
+                    indexName
+            );
+            if (count != null && count > 0) {
+                return;
+            }
+            jdbcTemplate.execute("CREATE INDEX " + indexName + " ON " + tableName + "(" + columns + ")");
         } catch (Exception ignored) {
             // 启动补丁失败时静默忽略，避免阻塞应用启动。
         }
