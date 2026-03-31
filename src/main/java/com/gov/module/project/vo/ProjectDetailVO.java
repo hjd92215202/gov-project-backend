@@ -3,6 +3,8 @@ package com.gov.module.project.vo;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 项目详情响应 VO。
@@ -25,4 +27,5 @@ public class ProjectDetailVO {
     private String description;
     private Integer status;
     private Long creatorDeptId;
+    private List<ProjectFileVO> attachments = new ArrayList<>();
 }

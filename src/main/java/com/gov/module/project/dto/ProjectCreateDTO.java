@@ -3,6 +3,7 @@ package com.gov.module.project.dto;
 import lombok.Data;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 项目新增请求 DTO。
@@ -25,4 +26,5 @@ public class ProjectCreateDTO {
     private Integer status;
     private Long creatorId;
     private Long creatorDeptId;
+    private List<ProjectAttachmentDTO> attachments;
 }

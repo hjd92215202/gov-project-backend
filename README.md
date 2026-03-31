@@ -1,7 +1,7 @@
 # 政务项目后端说明
 
 ## 架构文档
-- 后端专版架构说明：[`ARCHITECTURE_BACKEND.md`](./ARCHITECTURE_BACKEND.md)
+- 后端专版架构说明：[`ARCHITECTURE_BACKEND.md`](logs/ARCHITECTURE_BACKEND.md)
 - 全项目总览（前后端）：[`../PROJECT_ARCHITECTURE.md`](../PROJECT_ARCHITECTURE.md)
 - 性能基线脚本与说明：[`docs/PERF_BASELINE.md`](./docs/PERF_BASELINE.md)
 
@@ -76,3 +76,17 @@ docker run --name mdb1 `
 - 新增接口统一返回 `R(code,msg,data)` 结构
 - 返回给前端的错误文案优先使用明确中文
 - 新增日志与配置注释统一中文化
+
+## 6. JDK 版本锁定
+- 后端已在 `pom.xml` 中强制限制为 `JDK 1.8`，若使用更高或更低版本编译会直接失败。
+- 仓库内默认锁定的 JDK 路径为 `C:\Program Files\Java\jdk1.8.0_112`。
+- 若本机 JDK 8 路径不同，可在系统环境变量或项目根目录 `.env` 中设置 `GOV_JAVA_HOME=你的JDK8路径`。
+
+### 6.1 常用命令
+```powershell
+# 使用仓库锁定的 JDK 8 编译
+powershell -ExecutionPolicy Bypass -File ./scripts/mvn-jdk8.ps1 -q -DskipTests clean compile
+
+# 使用仓库锁定的 JDK 8 启动后端
+powershell -ExecutionPolicy Bypass -File ./scripts/start-dev-jdk8.ps1
+```

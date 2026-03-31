@@ -2,62 +2,56 @@ server:
   port: 8080
   servlet:
     context-path: /api
-    multipart:
-      max-file-size: 100MB # 允许上传较大的压缩包和资料文件
-      max-request-size: 500MB
 
 spring:
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 500MB
   mvc:
     pathmatch:
       matching-strategy: ant_path_matcher
-
   datasource:
-    # 开发环境默认连接本地 MariaDB。
-    # 如需切换到 openGauss，可改用下注释中的连接串。
-    # url: jdbc:opengauss://localhost:8888/gov_db?useUnicode=true&characterEncoding=utf8
-    url: jdbc:mariadb://localhost:13306/gov_db?useUnicode=true&characterEncoding=utf8&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&useInformationSchema=true
-    username: db_user
-    password: Egov@123
-    driver-class-name: org.mariadb.jdbc.Driver
-
+    url: ${GOV_DB_URL:jdbc:mariadb://localhost:13306/gov_db?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&useInformationSchema=true}
+    username: ${GOV_DB_USERNAME:db_user}
+    password: ${GOV_DB_PASSWORD:Egov@123}
+    driver-class-name: ${GOV_DB_DRIVER_CLASS_NAME:org.mariadb.jdbc.Driver}
+    hikari:
+      connection-init-sql: SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
 
-# MyBatis-Plus 配置
 mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   global-config:
     db-config:
-      id-type: assign_id # 使用雪花算法生成主键
-      logic-delete-field: deleted # 逻辑删除字段
+      id-type: assign_id
+      logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0
   configuration:
-    map-underscore-to-camel-case: true # 开启下划线转驼峰
-    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl # 避免在日志中输出敏感 SQL 参数
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
 
-# Sa-Token 登录鉴权配置
 sa-token:
   token-name: Authorization
-  timeout: 2592000 # token 有效期，单位秒，30 天
-  is-concurrent: false # 同一账号不允许并发登录，新登录会顶掉旧会话
-  is-share: false # 多端登录时不共享同一个 token
+  timeout: 2592000
+  is-concurrent: false
+  is-share: false
   token-style: uuid
 
-# MinIO 配置
 minio:
-  endpoint: http://127.0.0.1:9000
-  access-key: govadmin
-  secret-key: govadminpassword
-  bucket-name: gov-files
+  endpoint: ${GOV_MINIO_ENDPOINT:http://127.0.0.1:9000}
+  public-endpoint: ${GOV_MINIO_PUBLIC_ENDPOINT:${minio.endpoint}}
+  access-key: ${GOV_MINIO_ACCESS_KEY:govadmin}
+  secret-key: ${GOV_MINIO_SECRET_KEY:govadminpassword}
+  bucket-name: ${GOV_MINIO_BUCKET_NAME:gov-files}
 
-# Flowable 工作流配置
 flowable:
-  database-schema-update: true # 启动时自动初始化 Flowable 表结构
-  async-executor-activate: false # 当前无复杂异步流程节点，默认关闭异步执行器
+  database-schema-update: true
+  async-executor-activate: false
 
-# 应用日志配置
 logging:
   config: classpath:logback-spring.xml
   file:
@@ -66,8 +60,10 @@ logging:
     root: INFO
     com.gov.audit: INFO
 
-# 项目自定义安全与日志配置
 gov:
+  file:
+    temp-retain-hours: 24
+    temp-cleanup-cron: 0 0 4 * * ?
   security:
     sm4:
       key: ${GOV_SM4_KEY:1234567812345678}

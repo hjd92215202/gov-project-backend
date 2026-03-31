@@ -6,14 +6,17 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
+import com.gov.module.file.service.SysFileService;
 import com.gov.module.flow.service.FlowService;
 import com.gov.module.project.dto.ProjectCreateDTO;
 import com.gov.module.project.dto.ProjectSubmitDTO;
+import com.gov.module.project.dto.ProjectTempFileCleanupDTO;
 import com.gov.module.project.dto.ProjectUpdateDTO;
 import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.mapper.BizProjectMapper;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.ProjectDetailVO;
+import com.gov.module.project.vo.ProjectFileVO;
 import com.gov.module.project.vo.ProjectMapVO;
 import com.gov.module.project.vo.ProjectMapSummaryVO;
 import com.gov.module.project.vo.ProjectPageVO;
@@ -28,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -63,6 +67,9 @@ public class ProjectController {
 
     @Autowired
     private BizProjectMapper bizProjectMapper;
+
+    @Autowired
+    private SysFileService sysFileService;
 
     /**
      * 新增项目草稿。
@@ -103,8 +110,34 @@ public class ProjectController {
             return R.fail(phoneError);
         }
 
-        bizProjectService.save(project);
+        bizProjectService.saveProjectWithAttachments(project, payload.getAttachments());
         return R.ok("项目创建成功");
+    }
+
+    /**
+     * 上传项目附件。
+     * 上传成功后先落到临时文件表，等项目保存时再正式绑定到业务主键。
+     *
+     * @param file 上传文件
+     * @return 附件信息
+     */
+    @ApiOperation("上传项目附件")
+    @PostMapping(value = "/file/upload", consumes = "multipart/form-data")
+    public R<ProjectFileVO> uploadProjectFile(@RequestPart("file") MultipartFile file) {
+        return R.ok(sysFileService.uploadProjectFile(file), "上传成功");
+    }
+
+    /**
+     * 清理未提交保存的临时附件。
+     *
+     * @param payload 清理请求
+     * @return 清理结果
+     */
+    @ApiOperation("清理临时项目附件")
+    @PostMapping("/file/cleanup-temp")
+    public R<String> cleanupTempProjectFiles(@RequestBody ProjectTempFileCleanupDTO payload) {
+        int removedCount = sysFileService.cleanupTemporaryFiles(payload == null ? null : payload.getFileIds());
+        return R.ok(removedCount <= 0 ? "无需清理" : "已清理" + removedCount + "个临时附件");
     }
 
     /**
@@ -208,7 +241,7 @@ public class ProjectController {
         }
         perfLog.info("项目详情查询完成 userId={} projectId={} durationMs={}",
                 StpUtil.getLoginIdAsLong(), id, System.currentTimeMillis() - startAt);
-        return R.ok(toProjectDetailVO(project));
+        return R.ok(toProjectDetailVO(project, sysFileService.listProjectFiles(project.getId())));
     }
 
     /**
@@ -269,7 +302,7 @@ public class ProjectController {
             return R.fail(phoneError);
         }
 
-        bizProjectService.updateById(project);
+        bizProjectService.updateProjectWithAttachments(project, payload.getAttachments());
         return R.ok("项目更新成功");
     }
 
@@ -294,7 +327,7 @@ public class ProjectController {
             return R.fail(403, "无权限删除该项目");
         }
 
-        bizProjectService.removeById(id);
+        bizProjectService.removeProjectWithAttachments(id);
         return R.ok("项目删除成功");
     }
 
@@ -356,7 +389,7 @@ public class ProjectController {
                 return R.fail(phoneError);
             }
             createProject.setStatus(1);
-            bizProjectService.save(createProject);
+            bizProjectService.saveProjectWithAttachments(createProject, payload.getAttachments());
             projectId = createProject.getId();
         }
 
@@ -647,7 +680,7 @@ public class ProjectController {
      * @param project 项目实体
      * @return 详情 VO
      */
-    private ProjectDetailVO toProjectDetailVO(BizProject project) {
+    private ProjectDetailVO toProjectDetailVO(BizProject project, List<ProjectFileVO> attachments) {
         ProjectDetailVO vo = new ProjectDetailVO();
         if (project == null) {
             return vo;
@@ -667,6 +700,7 @@ public class ProjectController {
         vo.setDescription(project.getDescription());
         vo.setStatus(project.getStatus());
         vo.setCreatorDeptId(project.getCreatorDeptId());
+        vo.setAttachments(attachments == null ? new ArrayList<>() : attachments);
         return vo;
     }
 
