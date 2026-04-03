@@ -22,17 +22,19 @@
          │               │               │
          └───────────────┼───────────────┘
                          │
-                    ┌────▼────┐
-                    │ MariaDB  │  (机器2)
-                    │ 主库     │  8核 16GB
-                    │ 3306     │
-                    └────┬────┘
-                         │
-                    ┌────▼────┐
-                    │ MariaDB  │  (机器3)
-                    │ 从库     │  8核 16GB
-                    │ 3306     │
-                    └─────────┘
+         ┌───────────────┼───────────────┐
+         │               │               │
+    ┌────▼────┐     ┌────▼────┐    ┌────▼────┐
+    │ MariaDB  │     │ MinIO    │    │ 备份存储 │
+    │ 主库     │     │ 单点     │    │ (MinIO  │
+    │ 3306     │     │ 9000     │    │  备份)  │
+    │ 机器2    │     │ 机器2    │    │ 机器3   │
+    └────┬────┘     └─────────┘    └────┬────┘
+         │                              │
+    ┌────▼──────────────────────────────▼────┐
+    │  MariaDB 从库 (机器3)                    │
+    │  3306 (只读)                            │
+    └─────────────────────────────────────────┘
 ```
 
 ## 机器分配方案
@@ -46,22 +48,24 @@
   - 健康检查脚本
 ```
 
-### 机器2：后端应用 + MariaDB 主库
+### 机器2：后端应用 + MariaDB 主库 + MinIO 单点
 ```
-配置：4核 8GB / 100GB SSD + 500GB HDD
+配置：4核 8GB / 100GB SSD + 1TB HDD
 角色：
   - 后端应用实例2（8080）
   - MariaDB 主库（3306）
+  - MinIO 对象存储（9000/9001）
   - 数据库备份脚本
 ```
 
-### 机器3：后端应用 + MariaDB 从库
+### 机器3：后端应用 + MariaDB 从库 + 备份存储
 ```
-配置：4核 8GB / 100GB SSD + 500GB HDD
+配置：4核 8GB / 100GB SSD + 1TB HDD
 角色：
   - 后端应用实例3（8080）
-  - MariaDB 从库（3306）
-  - 从库只读，用于读备份
+  - MariaDB 从库（3306）- 只读
+  - MinIO 备份存储（定时同步）
+  - 备份恢复脚本
 ```
 
 ---
@@ -262,7 +266,277 @@ docker exec mariadb-slave mysql -uroot -proot@123 -e "SHOW SLAVE STATUS\G"
 
 ---
 
-### 第四步：后端应用部署（所有机器）
+### 第四步：MinIO 对象存储部署（机器2）
+
+#### 4.1 启动 MinIO 主实例
+
+创建 `docker-compose.yml`：
+```yaml
+version: '3.8'
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: govadmin
+      MINIO_ROOT_PASSWORD: govadminpassword
+    volumes:
+      - /data/minio:/minio_data
+    command: server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+```
+
+启动 MinIO：
+```bash
+mkdir -p /data/minio
+docker-compose up -d
+```
+
+验证 MinIO 运行：
+```bash
+curl http://192.168.1.11:9000/minio/health/live
+```
+
+#### 4.2 创建 MinIO 存储桶
+
+```bash
+# 安装 mc（MinIO 客户端）
+curl https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+chmod +x /usr/local/bin/mc
+
+# 配置 MinIO 连接
+mc alias set minio http://192.168.1.11:9000 govadmin govadminpassword
+
+# 创建存储桶
+mc mb minio/gov-files
+
+# 设置桶策略为公开读
+mc policy set public minio/gov-files
+```
+
+#### 4.3 后端应用配置 MinIO
+
+编辑 `backend.env`（所有三台机器）：
+```bash
+GOV_MINIO_ENDPOINT=http://192.168.1.11:9000
+GOV_MINIO_PUBLIC_ENDPOINT=http://192.168.1.11:9000
+GOV_MINIO_ACCESS_KEY=govadmin
+GOV_MINIO_SECRET_KEY=govadminpassword
+GOV_MINIO_BUCKET_NAME=gov-files
+```
+
+---
+
+### 第五步：MinIO 备份与恢复（机器2 + 机器3）
+
+#### 5.1 MinIO 备份脚本（机器2）
+
+创建 `/opt/scripts/minio_backup.sh`：
+```bash
+#!/bin/bash
+
+BACKUP_DIR="/data/minio-backup"
+BACKUP_RETENTION_DAYS=7
+REMOTE_HOST="192.168.1.12"
+REMOTE_USER="root"
+REMOTE_PATH="/data/minio-backup"
+
+# 创建备份目录
+mkdir -p $BACKUP_DIR
+
+# 备份 MinIO 数据
+BACKUP_FILE="$BACKUP_DIR/minio-backup-$(date +%Y%m%d-%H%M%S).tar.gz"
+tar -czf $BACKUP_FILE /data/minio
+
+if [ $? -eq 0 ]; then
+    echo "[$(date)] MinIO 备份成功: $BACKUP_FILE"
+    
+    # 同步到远程机器
+    scp $BACKUP_FILE $REMOTE_USER@$REMOTE_HOST:$REMOTE_PATH/
+    
+    if [ $? -eq 0 ]; then
+        echo "[$(date)] 备份同步到机器3成功"
+    else
+        echo "[$(date)] 备份同步失败"
+    fi
+else
+    echo "[$(date)] MinIO 备份失败"
+    exit 1
+fi
+
+# 清理本地过期备份
+find $BACKUP_DIR -name "minio-backup-*.tar.gz" -mtime +$BACKUP_RETENTION_DAYS -delete
+echo "[$(date)] 清理过期备份完成"
+```
+
+设置定时备份（每天 02:00）：
+```bash
+chmod +x /opt/scripts/minio_backup.sh
+
+# 编辑 crontab
+crontab -e
+
+# 添加以下行
+0 2 * * * /opt/scripts/minio_backup.sh >> /var/log/minio_backup.log 2>&1
+```
+
+#### 5.2 MinIO 恢复脚本（机器3）
+
+创建 `/opt/scripts/minio_restore.sh`：
+```bash
+#!/bin/bash
+
+BACKUP_FILE=$1
+RESTORE_DIR="/data/minio-restore"
+
+if [ -z "$BACKUP_FILE" ]; then
+    echo "用法: $0 <备份文件路径>"
+    echo "示例: $0 /data/minio-backup/minio-backup-20240101-020000.tar.gz"
+    exit 1
+fi
+
+if [ ! -f "$BACKUP_FILE" ]; then
+    echo "备份文件不存在: $BACKUP_FILE"
+    exit 1
+fi
+
+# 停止 MinIO（如果在机器3运行）
+docker stop minio 2>/dev/null
+
+# 创建恢复目录
+mkdir -p $RESTORE_DIR
+
+# 解压备份
+tar -xzf $BACKUP_FILE -C $RESTORE_DIR
+
+# 恢复数据
+cp -r $RESTORE_DIR/data/minio/* /data/minio/
+
+# 重启 MinIO
+docker start minio
+
+echo "[$(date)] MinIO 恢复完成"
+```
+
+设置执行权限：
+```bash
+chmod +x /opt/scripts/minio_restore.sh
+```
+
+---
+
+### 第六步：MinIO 故障转移流程
+
+#### 6.1 机器2 MinIO 故障时的处理
+
+**场景**：机器2 MinIO 宕机，需要快速恢复
+
+**步骤**：
+
+1. **检查故障**
+```bash
+curl http://192.168.1.11:9000/minio/health/live
+# 如果无响应，说明 MinIO 故障
+```
+
+2. **在机器3启动备用 MinIO**
+```bash
+# 机器3 上执行
+mkdir -p /data/minio-standby
+docker run -d \
+  --name minio-standby \
+  -p 9002:9000 \
+  -p 9003:9001 \
+  -e MINIO_ROOT_USER=govadmin \
+  -e MINIO_ROOT_PASSWORD=govadminpassword \
+  -v /data/minio-backup/latest:/minio_data \
+  minio/minio:latest \
+  server /minio_data --console-address ":9001"
+```
+
+3. **更新后端应用配置**
+```bash
+# 所有后端应用的 backend.env
+GOV_MINIO_ENDPOINT=http://192.168.1.12:9002
+GOV_MINIO_PUBLIC_ENDPOINT=http://192.168.1.12:9002
+
+# 重启后端应用
+docker restart backend
+```
+
+4. **恢复机器2 MinIO**
+```bash
+# 机器2 上执行
+docker restart minio
+
+# 验证
+curl http://192.168.1.11:9000/minio/health/live
+```
+
+5. **切换回主 MinIO**
+```bash
+# 所有后端应用的 backend.env
+GOV_MINIO_ENDPOINT=http://192.168.1.11:9000
+GOV_MINIO_PUBLIC_ENDPOINT=http://192.168.1.11:9000
+
+# 重启后端应用
+docker restart backend
+
+# 停止机器3的备用 MinIO
+docker stop minio-standby
+docker rm minio-standby
+```
+
+#### 6.2 自动故障转移脚本（可选）
+
+创建 `/opt/scripts/minio_failover.sh`：
+```bash
+#!/bin/bash
+
+PRIMARY_MINIO="http://192.168.1.11:9000"
+STANDBY_MINIO="http://192.168.1.12:9002"
+HEALTH_CHECK_INTERVAL=30
+FAILURE_THRESHOLD=3
+
+failure_count=0
+
+while true; do
+    # 检查主 MinIO 健康状态
+    if curl -f $PRIMARY_MINIO/minio/health/live > /dev/null 2>&1; then
+        failure_count=0
+        echo "[$(date)] 主 MinIO 正常"
+    else
+        failure_count=$((failure_count + 1))
+        echo "[$(date)] 主 MinIO 检查失败 ($failure_count/$FAILURE_THRESHOLD)"
+        
+        if [ $failure_count -ge $FAILURE_THRESHOLD ]; then
+            echo "[$(date)] 触发故障转移"
+            
+            # 在机器3启动备用 MinIO
+            ssh root@192.168.1.12 "docker start minio-standby 2>/dev/null || true"
+            
+            # 更新后端应用配置
+            # 这里需要根据实际情况调整
+            
+            failure_count=0
+        fi
+    fi
+    
+    sleep $HEALTH_CHECK_INTERVAL
+done
+```
+
+---
+
+### 第七步：后端应用部署（所有机器）
 
 #### 4.1 准备应用包
 
