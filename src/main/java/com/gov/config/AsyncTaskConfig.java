@@ -19,6 +19,7 @@ public class AsyncTaskConfig {
 
     /**
      * 审计日志异步线程池。
+     * 100人并发场景下调大核心线程数，避免队列积压后 CallerRunsPolicy 拖慢主线程。
      * 使用有界队列并在极端拥塞时退回调用线程，避免无限堆积导致内存风险。
      *
      * @return 审计日志线程池执行器
@@ -26,12 +27,12 @@ public class AsyncTaskConfig {
     @Bean("auditLogExecutor")
     public Executor auditLogExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(2);
-        executor.setMaxPoolSize(4);
-        executor.setQueueCapacity(2000);
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(5000);
         executor.setThreadNamePrefix("audit-log-");
         executor.setWaitForTasksToCompleteOnShutdown(true);
-        executor.setAwaitTerminationSeconds(10);
+        executor.setAwaitTerminationSeconds(30);
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
         executor.initialize();
         return executor;

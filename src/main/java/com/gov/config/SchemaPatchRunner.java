@@ -1,5 +1,7 @@
 package com.gov.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -7,20 +9,16 @@ import org.springframework.stereotype.Component;
 
 /**
  * 职责：在应用启动阶段补齐历史库缺失的字段与索引。
- * 为什么存在：不同环境的建库时间不一致，容易出现“字段已升级但索引没跟上”的情况，
- * 这里统一做启动期兜底，保证性能优化项可以尽快生效。
+ * 补丁失败时不再静默忽略，改为 warn 日志，便于运维发现问题。
  */
 @Component
 public class SchemaPatchRunner implements CommandLineRunner {
 
+    private static final Logger log = LoggerFactory.getLogger(SchemaPatchRunner.class);
+
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    /**
-     * 启动后执行结构补丁。
-     *
-     * @param args 启动参数
-     */
     @Override
     public void run(String... args) {
         safeExec("ALTER TABLE sys_role ADD COLUMN IF NOT EXISTS menu_perms VARCHAR(1000) DEFAULT NULL COMMENT '菜单权限键集合（逗号分隔）'");
@@ -92,45 +90,39 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("DELETE FROM biz_project WHERE "
                 + "(id = 2 AND project_code = 'GC-002' AND project_name = '西安市莲湖区老旧改造工程') "
                 + "OR (id = 3 AND project_code = 'GC-003' AND project_name = '咸阳市某桥梁项目')");
+
+        log.info("SchemaPatchRunner 执行完毕");
     }
 
     /**
      * 安全执行单条 SQL。
-     * 这批补丁以“尽量补齐”为目标，重复创建索引或字段时不应阻塞服务启动。
-     *
-     * @param sql 待执行 SQL
+     * 补丁失败时输出 warn 日志，不再静默忽略，便于运维发现问题。
      */
     private void safeExec(String sql) {
         try {
             jdbcTemplate.execute(sql);
-        } catch (Exception ignored) {
-            // 启动补丁失败时静默忽略，避免阻塞应用启动。
+        } catch (Exception e) {
+            log.warn("SchemaPatch 执行失败（可忽略重复补丁）: {} | error: {}",
+                    sql.length() > 120 ? sql.substring(0, 120) + "..." : sql, e.getMessage());
         }
     }
 
     /**
-     * 幂等补齐索引。
-     * 先查 information_schema，只有索引缺失时才创建，避免每次启动都刷重复索引警告。
-     *
-     * @param tableName 表名
-     * @param indexName 索引名
-     * @param columns   索引字段列表
+     * 幂等补齐索引。先查 information_schema，只有索引缺失时才创建。
      */
     private void ensureIndex(String tableName, String indexName, String columns) {
         try {
             Integer count = jdbcTemplate.queryForObject(
                     "SELECT COUNT(1) FROM information_schema.statistics "
                             + "WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?",
-                    Integer.class,
-                    tableName,
-                    indexName
-            );
+                    Integer.class, tableName, indexName);
             if (count != null && count > 0) {
                 return;
             }
             jdbcTemplate.execute("CREATE INDEX " + indexName + " ON " + tableName + "(" + columns + ")");
-        } catch (Exception ignored) {
-            // 启动补丁失败时静默忽略，避免阻塞应用启动。
+            log.info("SchemaPatch 创建索引成功: {}.{}", tableName, indexName);
+        } catch (Exception e) {
+            log.warn("SchemaPatch 创建索引失败: {}.{} | error: {}", tableName, indexName, e.getMessage());
         }
     }
 }

@@ -2,8 +2,17 @@ server:
   port: 8080
   servlet:
     context-path: /api
+  shutdown: graceful
+  tomcat:
+    threads:
+      max: 200
+      min-spare: 20
+    accept-count: 100
+    connection-timeout: 20000
 
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
   servlet:
     multipart:
       max-file-size: 100MB
@@ -18,6 +27,14 @@ spring:
     driver-class-name: ${GOV_DB_DRIVER_CLASS_NAME:org.mariadb.jdbc.Driver}
     hikari:
       connection-init-sql: SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci
+      maximum-pool-size: ${GOV_DB_POOL_MAX:20}
+      minimum-idle: ${GOV_DB_POOL_MIN:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 60000
+      pool-name: GovHikariPool
+      leak-detection-threshold: 60000
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: GMT+8
@@ -37,8 +54,8 @@ mybatis-plus:
 sa-token:
   token-name: Authorization
   timeout: 2592000
-  is-concurrent: false
-  is-share: false
+  is-concurrent: true
+  is-share: true
   token-style: uuid
 
 minio:
@@ -51,6 +68,18 @@ minio:
 flowable:
   database-schema-update: true
   async-executor-activate: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+  server:
+    port: ${GOV_ACTUATOR_PORT:8081}
 
 logging:
   config: classpath:logback-spring.xml
@@ -79,3 +108,7 @@ gov:
     cleanup-cron: 0 30 3 * * ?
     audit-retain-days: 180
     frontend-monitor-retain-days: 30
+  rate-limit:
+    enabled: ${GOV_RATE_LIMIT_ENABLED:true}
+    max-requests-per-second: ${GOV_RATE_LIMIT_RPS:30}
+    burst-capacity: ${GOV_RATE_LIMIT_BURST:60}

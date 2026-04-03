@@ -8,26 +8,21 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Sa-Token 登录拦截配置。
- * 这个类的职责是把“哪些接口必须先登录”统一收口到 Web 层，
- * 让业务 controller 不需要重复写登录校验代码。
+ * 统一收口哪些接口必须先登录，健康检查接口无需登录。
  */
 @Configuration
 public class SaTokenConfig implements WebMvcConfigurer {
 
-    /**
-     * 注册登录拦截器并声明放行路径。
-     *
-     * @param registry Spring MVC 拦截器注册表
-     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        // 注册 Sa-Token 拦截器，校验规则为 StpUtil.checkLogin() 登录校验
         registry.addInterceptor(new SaInterceptor(handle -> StpUtil.checkLogin()))
-                .addPathPatterns("/**") // 拦截所有路由
+                .addPathPatterns("/**")
                 .excludePathPatterns(
-                        "/system/login",     // 排除登录接口
-                        "/doc.html",         // 排除 Knife4j 的入口
-                        "/webjars/**",       // 排除 Swagger 静态资源
+                        "/system/login",
+                        "/health/live",
+                        "/health/ready",
+                        "/doc.html",
+                        "/webjars/**",
                         "/swagger-resources/**",
                         "/v2/api-docs"
                 );
