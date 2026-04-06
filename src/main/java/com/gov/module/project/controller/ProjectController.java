@@ -6,7 +6,9 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
+import com.gov.module.file.entity.SysFile;
 import com.gov.module.file.service.SysFileService;
+import com.gov.module.file.support.MinioAccessUrlBuilder;
 import com.gov.module.flow.service.FlowService;
 import com.gov.module.project.dto.ProjectCreateDTO;
 import com.gov.module.project.dto.ProjectSubmitDTO;
@@ -25,15 +27,24 @@ import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.UserAccessContext;
+import io.minio.GetObjectArgs;
+import io.minio.GetObjectResponse;
+import io.minio.MinioClient;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -75,6 +86,15 @@ public class ProjectController {
 
     @Autowired
     private SysFileService sysFileService;
+
+    @Autowired
+    private MinioClient minioClient;
+
+    @Autowired
+    private MinioAccessUrlBuilder minioAccessUrlBuilder;
+
+    @Value("${minio.bucket-name}")
+    private String bucketName;
 
     /**
      * 新增项目草稿。
@@ -129,16 +149,68 @@ public class ProjectController {
     @ApiOperation("上传项目附件")
     @PostMapping(value = "/file/upload", consumes = "multipart/form-data")
     public R<ProjectFileVO> uploadProjectFile(@RequestPart("file") MultipartFile file) {
-        return R.ok(sysFileService.uploadProjectFile(file), "上传成功");
+        return R.ok(sysFileService.uploadProjectFile(file), "Upload success");
     }
 
-    /**
-     * 清理未提交保存的临时附件。
-     *
-     * @param payload 清理请求
-     * @return 清理结果
-     */
-    @ApiOperation("清理临时项目附件")
+    @ApiOperation("Download project attachment")
+    @GetMapping("/file/download/{id}")
+    public void downloadProjectFile(@PathVariable Long id, HttpServletResponse response) throws IOException {
+        if (id == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Attachment id is required");
+            return;
+        }
+
+        SysFile file = sysFileService.getById(id);
+        if (file == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment not found");
+            return;
+        }
+        if (StrUtil.isBlank(file.getFilePath())) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment object path is missing");
+            return;
+        }
+
+        if (file.getBizId() != null) {
+            BizProject project = bizProjectService.getById(file.getBizId());
+            if (project == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Project not found");
+                return;
+            }
+            if (!canOperateProject(project, currentAccessContext())) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+                return;
+            }
+        } else {
+            // Keep temporary attachments downloadable inside the project edit flow.
+            StpUtil.getLoginIdAsLong();
+        }
+
+        response.reset();
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(resolveDownloadContentType(file.getFileType()));
+        response.setHeader("Content-Disposition", minioAccessUrlBuilder.buildDownloadContentDisposition(file.getFileName()));
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        if (file.getFileSize() != null && file.getFileSize() >= 0) {
+            response.setContentLengthLong(file.getFileSize());
+        }
+
+        try (GetObjectResponse objectStream = minioClient.getObject(GetObjectArgs.builder()
+                .bucket(bucketName)
+                .object(file.getFilePath())
+                .build())) {
+            StreamUtils.copy(objectStream, response.getOutputStream());
+            response.flushBuffer();
+        } catch (Exception e) {
+            if (!response.isCommitted()) {
+                response.reset();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Attachment download failed");
+                return;
+            }
+            throw new IllegalStateException("Failed to stream project attachment: " + id, e);
+        }
+    }
+
+    @ApiOperation("Cleanup temporary project attachments")
     @PostMapping("/file/cleanup-temp")
     public R<String> cleanupTempProjectFiles(@RequestBody ProjectTempFileCleanupDTO payload) {
         int removedCount = sysFileService.cleanupTemporaryFiles(payload == null ? null : payload.getFileIds());
@@ -860,6 +932,19 @@ public class ProjectController {
         if (value.compareTo(min) < 0 || value.compareTo(max) > 0) {
             throw new IllegalArgumentException(label + "范围应为 " + min.toPlainString() + " 到 " + max.toPlainString());
         }
+    }
+
+    private String resolveDownloadContentType(String fileType) {
+        String normalizedType = StrUtil.trimToEmpty(fileType);
+        if (StrUtil.contains(normalizedType, "/")) {
+            try {
+                MediaType.parseMediaType(normalizedType);
+                return normalizedType;
+            } catch (Exception ignored) {
+                // Fall through to the default content type below.
+            }
+        }
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
     }
 
     private UserAccessContext currentAccessContext() {

@@ -2,6 +2,9 @@ package com.gov.module.project.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.gov.common.result.R;
+import com.gov.module.file.entity.SysFile;
+import com.gov.module.file.service.SysFileService;
+import com.gov.module.file.support.MinioAccessUrlBuilder;
 import com.gov.module.flow.service.FlowService;
 import com.gov.module.project.dto.ProjectCreateDTO;
 import com.gov.module.project.dto.ProjectSubmitDTO;
@@ -14,6 +17,7 @@ import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
 import com.gov.module.system.service.SysUserService;
 import com.gov.module.system.vo.UserAccessContext;
+import io.minio.MinioClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +25,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
@@ -54,11 +59,24 @@ class ProjectControllerTest {
     @Mock
     private SysDeptService sysDeptService;
 
+    @Mock
+    private SysFileService sysFileService;
+
+    @Mock
+    private MinioClient minioClient;
+
+    @Mock
+    private MinioAccessUrlBuilder minioAccessUrlBuilder;
+
     @BeforeEach
     void setUp() {
         ReflectionTestUtils.setField(controller, "bizProjectService", bizProjectService);
         ReflectionTestUtils.setField(controller, "sysUserService", sysUserService);
         ReflectionTestUtils.setField(controller, "sysDeptService", sysDeptService);
+        ReflectionTestUtils.setField(controller, "sysFileService", sysFileService);
+        ReflectionTestUtils.setField(controller, "minioClient", minioClient);
+        ReflectionTestUtils.setField(controller, "minioAccessUrlBuilder", minioAccessUrlBuilder);
+        ReflectionTestUtils.setField(controller, "bucketName", "gov-files");
         ReflectionTestUtils.setField(controller, "flowService", recordingFlowService);
         recordingFlowService.businessKey = null;
         recordingFlowService.variables = null;
@@ -91,7 +109,7 @@ class ProjectControllerTest {
             R<String> result = controller.add(payload);
 
             ArgumentCaptor<BizProject> captor = ArgumentCaptor.forClass(BizProject.class);
-            verify(bizProjectService).save(captor.capture());
+            verify(bizProjectService).saveProjectWithAttachments(captor.capture(), any());
             BizProject saved = captor.getValue();
 
             assertEquals(Integer.valueOf(200), result.getCode());
@@ -127,6 +145,37 @@ class ProjectControllerTest {
 
             assertEquals(Integer.valueOf(403), result.getCode());
             assertNull(result.getData());
+        }
+    }
+
+    @Test
+    void downloadProjectFile_shouldRejectAttachmentOutsideCurrentScope() throws Exception {
+        SysFile file = new SysFile();
+        file.setId(5L);
+        file.setBizId(9L);
+        file.setFilePath("project/2026/04/07/demo.pdf");
+
+        BizProject project = new BizProject();
+        project.setId(9L);
+        project.setCreatorId(200L);
+        project.setCreatorDeptId(20L);
+
+        UserAccessContext context = new UserAccessContext();
+        context.setUserId(100L);
+        context.setDeptId(9L);
+
+        when(sysFileService.getById(5L)).thenReturn(file);
+        when(bizProjectService.getById(9L)).thenReturn(project);
+
+        try (MockedStatic<StpUtil> stp = mockStatic(StpUtil.class)) {
+            stp.when(StpUtil::getLoginIdAsLong).thenReturn(100L);
+            when(sysUserService.getAccessContext(100L)).thenReturn(context);
+
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            controller.downloadProjectFile(5L, response);
+
+            assertEquals(403, response.getStatus());
+            verify(minioClient, never()).getObject(any());
         }
     }
 
@@ -173,7 +222,7 @@ class ProjectControllerTest {
             R<String> result = controller.delete(1L);
 
             assertEquals(Integer.valueOf(200), result.getCode());
-            verify(bizProjectService).removeById(1L);
+            verify(bizProjectService).removeProjectWithAttachments(1L);
         }
     }
 
@@ -204,7 +253,7 @@ class ProjectControllerTest {
 
             assertEquals(Integer.valueOf(500), result.getCode());
             assertEquals("联系电话格式不正确，请填写7到20位数字，可包含短横线", result.getMsg());
-            verify(bizProjectService, never()).save(any(BizProject.class));
+            verify(bizProjectService, never()).saveProjectWithAttachments(any(BizProject.class), any());
         }
     }
 
@@ -244,7 +293,7 @@ class ProjectControllerTest {
             R<String> result = controller.add(payload);
 
             ArgumentCaptor<BizProject> captor = ArgumentCaptor.forClass(BizProject.class);
-            verify(bizProjectService).save(captor.capture());
+            verify(bizProjectService).saveProjectWithAttachments(captor.capture(), any());
             assertEquals(Integer.valueOf(200), result.getCode());
             assertEquals("13900000000", captor.getValue().getLeaderPhone());
         }

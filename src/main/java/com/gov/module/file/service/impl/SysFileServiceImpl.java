@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -42,6 +41,8 @@ import java.util.stream.Collectors;
  */
 @Service
 public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> implements SysFileService {
+
+    private static final String PROJECT_FILE_DOWNLOAD_PATH_PREFIX = "/api/project/file/download/";
 
     private static final Set<String> IMAGE_EXTENSIONS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
             "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"
@@ -224,7 +225,7 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         vo.setImage(isImageFile(file.getFileType(), file.getFileName()));
         String previewUrl = buildPreviewUrl(file.getFilePath());
         vo.setPreviewUrl(previewUrl);
-        vo.setDownloadUrl(buildDownloadUrl(file.getFilePath(), file.getFileName()));
+        vo.setDownloadUrl(buildDownloadUrl(file.getId()));
         vo.setAccessUrl(previewUrl);
         return vo;
     }
@@ -263,13 +264,11 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         return buildAccessUrl(objectName, null, null);
     }
 
-    private String buildDownloadUrl(String objectName, String fileName) {
-        if (StrUtil.isBlank(objectName)) {
+    private String buildDownloadUrl(Long fileId) {
+        if (fileId == null) {
             return "";
         }
-        Map<String, String> extraQueryParams = new HashMap<String, String>();
-        extraQueryParams.put("response-content-disposition", minioAccessUrlBuilder.buildDownloadContentDisposition(fileName));
-        return buildAccessUrl(objectName, extraQueryParams, minioAccessUrlBuilder.buildPublicDownloadUrl(objectName, fileName));
+        return PROJECT_FILE_DOWNLOAD_PATH_PREFIX + fileId;
     }
 
     private String buildAccessUrl(String objectName, Map<String, String> extraQueryParams, String fallbackUrl) {
