@@ -25,9 +25,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -220,7 +222,10 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         vo.setFileType(file.getFileType());
         vo.setFileSize(file.getFileSize());
         vo.setImage(isImageFile(file.getFileType(), file.getFileName()));
-        vo.setAccessUrl(buildAccessUrl(file.getFilePath()));
+        String previewUrl = buildPreviewUrl(file.getFilePath());
+        vo.setPreviewUrl(previewUrl);
+        vo.setDownloadUrl(buildDownloadUrl(file.getFilePath(), file.getFileName()));
+        vo.setAccessUrl(previewUrl);
         return vo;
     }
 
@@ -254,20 +259,36 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         return StrUtil.isNotBlank(suffix) && IMAGE_EXTENSIONS.contains(suffix.toLowerCase());
     }
 
-    private String buildAccessUrl(String objectName) {
+    private String buildPreviewUrl(String objectName) {
+        return buildAccessUrl(objectName, null, null);
+    }
+
+    private String buildDownloadUrl(String objectName, String fileName) {
+        if (StrUtil.isBlank(objectName)) {
+            return "";
+        }
+        Map<String, String> extraQueryParams = new HashMap<String, String>();
+        extraQueryParams.put("response-content-disposition", minioAccessUrlBuilder.buildDownloadContentDisposition(fileName));
+        return buildAccessUrl(objectName, extraQueryParams, minioAccessUrlBuilder.buildPublicDownloadUrl(objectName, fileName));
+    }
+
+    private String buildAccessUrl(String objectName, Map<String, String> extraQueryParams, String fallbackUrl) {
         if (StrUtil.isBlank(objectName)) {
             return "";
         }
         try {
-            String accessUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+            GetPresignedObjectUrlArgs.Builder builder = GetPresignedObjectUrlArgs.builder()
                     .method(Method.GET)
                     .bucket(bucketName)
                     .object(objectName)
-                    .expiry(2, TimeUnit.HOURS)
-                    .build());
+                    .expiry(2, TimeUnit.HOURS);
+            if (extraQueryParams != null && !extraQueryParams.isEmpty()) {
+                builder.extraQueryParams(extraQueryParams);
+            }
+            String accessUrl = minioClient.getPresignedObjectUrl(builder.build());
             return minioAccessUrlBuilder.rewriteToPublicUrl(accessUrl);
         } catch (Exception ignored) {
-            return minioAccessUrlBuilder.buildPublicObjectUrl(objectName);
+            return StrUtil.blankToDefault(fallbackUrl, minioAccessUrlBuilder.buildPublicObjectUrl(objectName));
         }
     }
 }

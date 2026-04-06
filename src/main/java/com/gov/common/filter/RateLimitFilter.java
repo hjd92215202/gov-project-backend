@@ -14,11 +14,10 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * 职责：基于令牌桶算法对每个 IP 进行限流，防止单个客户端打垮服务。
- * 为什么存在：100人并发场景下，若某个客户端异常重试或恶意刷接口，
+ * 职责：基于令牌桶算法对每个 IP 进行限流，防止单个客户端打满服务。
+ * 为什么存在：100 人并发场景下，若某个客户端异常重试或恶意刷接口，
  * 会挤占其他用户的连接池和线程资源，需要在入口层做第一道防护。
  */
 @Component
@@ -37,7 +36,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private int burstCapacity;
 
     // IP -> [tokens, lastRefillTime]
-    private final ConcurrentHashMap<String, long[]> buckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, long[]> buckets = new ConcurrentHashMap<String, long[]>();
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -57,7 +56,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             log.warn("限流触发 ip={} uri={}", ip, request.getRequestURI());
             response.setStatus(429);
             response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{"code":429,"msg":"请求过于频繁，请稍后再试","data":null}");
+            response.getWriter().write("{\"code\":429,\"msg\":\"请求过于频繁，请稍后再试\",\"data\":null}");
             return;
         }
         chain.doFilter(request, response);

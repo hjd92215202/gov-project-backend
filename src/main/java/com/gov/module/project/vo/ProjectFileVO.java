@@ -14,5 +14,7 @@ public class ProjectFileVO {
     private String fileType;
     private Long fileSize;
     private Boolean image;
+    private String previewUrl;
+    private String downloadUrl;
     private String accessUrl;
 }

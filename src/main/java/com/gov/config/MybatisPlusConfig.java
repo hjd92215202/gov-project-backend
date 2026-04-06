@@ -10,6 +10,7 @@ import org.apache.ibatis.plugin.Intercepts;
 import org.apache.ibatis.plugin.Invocation;
 import org.apache.ibatis.plugin.Plugin;
 import org.apache.ibatis.plugin.Signature;
+import org.apache.ibatis.session.ResultHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,7 +55,7 @@ public class MybatisPlusConfig {
     }
 
     @Intercepts({
-        @Signature(type = StatementHandler.class, method = "query", args = {Statement.class, java.sql.ResultHandler.class}),
+        @Signature(type = StatementHandler.class, method = "query", args = {Statement.class, ResultHandler.class}),
         @Signature(type = StatementHandler.class, method = "update", args = {Statement.class})
     })
     public static class SlowSqlInterceptor implements Interceptor {
@@ -74,7 +75,7 @@ public class MybatisPlusConfig {
                 if (cost >= slowSqlThresholdMs) {
                     StatementHandler handler = (StatementHandler) invocation.getTarget();
                     BoundSql boundSql = handler.getBoundSql();
-                    String sql = boundSql.getSql().replaceAll("\s+", " ").trim();
+                    String sql = boundSql.getSql().replaceAll("\\s+", " ").trim();
                     log.warn("慢SQL告警 costMs={} sql={}", cost, sql.length() > 500 ? sql.substring(0, 500) + "..." : sql);
                 }
             }
