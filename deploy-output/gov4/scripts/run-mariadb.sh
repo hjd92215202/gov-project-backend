@@ -19,7 +19,12 @@ read_env_value() {
   printf '%s' "${matched_line#*=}" | tr -d '\r'
 }
 
-MYSQL_ROOT_PASSWORD_VALUE=$(read_env_value "MYSQL_ROOT_PASSWORD" "123")
+MYSQL_ROOT_PASSWORD_VALUE=$(read_env_value "MYSQL_ROOT_PASSWORD" "")
+
+if [ -z "${MYSQL_ROOT_PASSWORD_VALUE}" ] || [ "${MYSQL_ROOT_PASSWORD_VALUE}" = "CHANGE_ME" ]; then
+  echo "未配置 MYSQL_ROOT_PASSWORD，请先在 /opt/gov4/backend/backend.env 中填写真实值"
+  exit 1
+fi
 
 docker network inspect gov4-net >/dev/null 2>&1 || docker network create gov4-net
 docker rm -f gov4-mariadb >/dev/null 2>&1 || true

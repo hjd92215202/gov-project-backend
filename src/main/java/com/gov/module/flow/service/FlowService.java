@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.gov.common.exception.BizException;
 import com.gov.module.project.entity.BizProject;
 import com.gov.module.project.service.BizProjectService;
 import com.gov.module.project.vo.FlowTaskVO;
@@ -238,11 +239,11 @@ public class FlowService {
         long startAt = System.currentTimeMillis();
         Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
         if (task == null) {
-            throw new RuntimeException("审批任务不存在");
+            throw new BizException(404, "审批任务不存在");
         }
         String currentLoginId = StpUtil.getLoginIdAsString();
         if (task.getAssignee() == null || !Objects.equals(task.getAssignee(), currentLoginId)) {
-            throw new RuntimeException("当前任务不属于当前登录用户");
+            throw new BizException(403, "当前任务不属于当前登录用户");
         }
 
         String processInstanceId = task.getProcessInstanceId();
@@ -262,19 +263,19 @@ public class FlowService {
         }
 
         if (task.getAssignee() == null) {
-            throw new RuntimeException("审批任务未分配处理人");
+            throw new BizException(400, "审批任务未分配处理人");
         }
         Long currentUserId = Long.parseLong(task.getAssignee());
         SysUser currentUser = sysUserService.getById(currentUserId);
         if (currentUser == null) {
-            throw new RuntimeException("审批人不存在");
+            throw new BizException(404, "审批人不存在");
         }
         if (currentUser.getDeptId() == null) {
-            throw new RuntimeException("审批人未绑定部门");
+            throw new BizException(400, "审批人未绑定部门");
         }
         SysDept currentDept = sysDeptService.getById(currentUser.getDeptId());
         if (currentDept == null) {
-            throw new RuntimeException("审批人所属部门不存在");
+            throw new BizException(404, "审批人所属部门不存在");
         }
 
         SysDept parentDept = sysDeptService.getById(currentDept.getParentId());

@@ -2,16 +2,17 @@ package com.gov.module.system.dto;
 
 import lombok.Data;
 
+import javax.validation.Valid;
+import javax.validation.constraints.Size;
 import java.util.List;
 
 /**
- * 职责：定义前端监控日志批量上报 DTO。
- * 为什么存在：浏览器需要批量发送日志，避免频繁逐条请求增加网络开销。
- * 关键输入输出：输入为日志项列表，输出为控制器内批量落库操作。
- * 关联链路：前端监控上报。
+ * 前端监控批量上报 DTO。
  */
 @Data
 public class FrontendLogReportDTO {
-    /** 批量上报的日志项集合。 */
+
+    @Valid
+    @Size(max = 50, message = "前端监控单次上报不能超过50条")
     private List<FrontendLogItemDTO> logs;
 }

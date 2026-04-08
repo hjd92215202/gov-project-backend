@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableLogic;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.gov.crypto.SmTypeHandler;
 import lombok.Data;
 
@@ -32,6 +33,7 @@ public class SysUser implements Serializable {
     /** 登录用户名。 */
     private String username;
     /** 加密后的密码摘要。 */
+    @JsonIgnore
     private String password;
     /** 真实姓名。 */
     private String realName;

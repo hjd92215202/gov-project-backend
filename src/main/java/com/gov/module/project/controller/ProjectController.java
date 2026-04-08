@@ -37,11 +37,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.util.StreamUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -60,8 +62,10 @@ import java.util.regex.Pattern;
 @Api(tags = "项目管理")
 @RestController
 @RequestMapping("/project")
+@Validated
 public class ProjectController {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProjectController.class);
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
     private static final Pattern CONTACT_PHONE_PATTERN = Pattern.compile("^[0-9-]{7,20}$");
     private static final BigDecimal LONGITUDE_MIN = new BigDecimal("-180");
@@ -104,7 +108,7 @@ public class ProjectController {
      */
     @ApiOperation("新增项目")
     @PostMapping("/add")
-    public R<String> add(@RequestBody ProjectCreateDTO payload) {
+    public R<String> add(@Valid @RequestBody ProjectCreateDTO payload) {
         BizProject project = toProjectEntity(payload);
         if (StrUtil.isBlank(project.getProjectName())) {
             return R.fail("项目名称不能为空");
@@ -212,7 +216,7 @@ public class ProjectController {
 
     @ApiOperation("Cleanup temporary project attachments")
     @PostMapping("/file/cleanup-temp")
-    public R<String> cleanupTempProjectFiles(@RequestBody ProjectTempFileCleanupDTO payload) {
+    public R<String> cleanupTempProjectFiles(@Valid @RequestBody ProjectTempFileCleanupDTO payload) {
         int removedCount = sysFileService.cleanupTemporaryFiles(payload == null ? null : payload.getFileIds());
         return R.ok(removedCount <= 0 ? "无需清理" : "已清理" + removedCount + "个临时附件");
     }
@@ -330,7 +334,7 @@ public class ProjectController {
      */
     @ApiOperation("更新项目")
     @PutMapping("/update")
-    public R<String> update(@RequestBody ProjectUpdateDTO payload) {
+    public R<String> update(@Valid @RequestBody ProjectUpdateDTO payload) {
         BizProject project = toProjectEntity(payload);
         if (project.getId() == null) {
             return R.fail("项目ID不能为空");
@@ -417,7 +421,7 @@ public class ProjectController {
      */
     @ApiOperation("提交项目审批")
     @PostMapping("/submit")
-    public R<String> submit(@RequestBody ProjectSubmitDTO payload) {
+    public R<String> submit(@Valid @RequestBody ProjectSubmitDTO payload) {
         long startAt = System.currentTimeMillis();
         Long currentUserId = StpUtil.getLoginIdAsLong();
         SysUser currentUser = sysUserService.getById(currentUserId);
@@ -940,8 +944,9 @@ public class ProjectController {
             try {
                 MediaType.parseMediaType(normalizedType);
                 return normalizedType;
-            } catch (Exception ignored) {
-                // Fall through to the default content type below.
+            } catch (Exception exception) {
+                LOGGER.warn("附件 contentType 非法 fileType={} message={}，回退为 application/octet-stream",
+                        fileType, exception.getMessage());
             }
         }
         return MediaType.APPLICATION_OCTET_STREAM_VALUE;

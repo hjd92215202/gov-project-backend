@@ -3,10 +3,12 @@ package com.gov.module.flow.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gov.common.exception.GlobalExceptionHandler;
 import com.gov.module.flow.service.FlowService;
 import com.gov.module.project.vo.FlowTaskVO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -39,8 +41,13 @@ class FlowControllerMockMvcTest {
     @BeforeEach
     void setUp() {
         FlowController controller = new FlowController();
+        LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
+        validator.afterPropertiesSet();
         ReflectionTestUtils.setField(controller, "flowService", flowService);
-        mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
+        mockMvc = MockMvcBuilders.standaloneSetup(controller)
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .setValidator(validator)
+                .build();
         flowService.todoPage = null;
         flowService.donePage = null;
         flowService.approveTaskId = null;
@@ -79,9 +86,9 @@ class FlowControllerMockMvcTest {
         mockMvc.perform(post("/flow/approve")
                         .contentType(APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(payload)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value(500))
-                .andExpect(jsonPath("$.msg").value("审批参数不能为空"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value(400))
+                .andExpect(jsonPath("$.msg").value("审批结果不能为空"));
     }
 
     /**

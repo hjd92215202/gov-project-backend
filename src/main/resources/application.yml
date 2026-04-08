@@ -23,7 +23,7 @@ spring:
   datasource:
     url: ${GOV_DB_URL:jdbc:mariadb://localhost:13306/gov_db?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&useInformationSchema=true}
     username: ${GOV_DB_USERNAME:db_user}
-    password: ${GOV_DB_PASSWORD:Egov@123}
+    password: ${GOV_DB_PASSWORD:}
     driver-class-name: ${GOV_DB_DRIVER_CLASS_NAME:org.mariadb.jdbc.Driver}
     hikari:
       connection-init-sql: SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci
@@ -61,8 +61,8 @@ sa-token:
 minio:
   endpoint: ${GOV_MINIO_ENDPOINT:http://127.0.0.1:9000}
   public-endpoint: ${GOV_MINIO_PUBLIC_ENDPOINT:${minio.endpoint}}
-  access-key: ${GOV_MINIO_ACCESS_KEY:govadmin}
-  secret-key: ${GOV_MINIO_SECRET_KEY:govadminpassword}
+  access-key: ${GOV_MINIO_ACCESS_KEY:}
+  secret-key: ${GOV_MINIO_SECRET_KEY:}
   bucket-name: ${GOV_MINIO_BUCKET_NAME:gov-files}
 
 flowable:
@@ -95,7 +95,7 @@ gov:
     temp-cleanup-cron: 0 0 4 * * ?
   security:
     sm4:
-      key: ${GOV_SM4_KEY:1234567812345678}
+      key: ${GOV_SM4_KEY:}
       enabled: ${GOV_SM4_ENABLED:true}
       allow-plaintext-fallback: ${GOV_SM4_ALLOW_PLAINTEXT_FALLBACK:true}
     password:

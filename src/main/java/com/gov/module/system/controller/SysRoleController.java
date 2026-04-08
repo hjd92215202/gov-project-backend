@@ -19,8 +19,10 @@ import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -38,6 +40,7 @@ import java.util.Map;
 @Api(tags = "角色管理")
 @RestController
 @RequestMapping("/system/role")
+@Validated
 public class SysRoleController {
 
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
@@ -135,7 +138,7 @@ public class SysRoleController {
      */
     @ApiOperation("新增角色")
     @PostMapping("/add")
-    public R<String> add(@RequestBody RoleCreateDTO payload) {
+    public R<String> add(@Valid @RequestBody RoleCreateDTO payload) {
         long startAt = System.currentTimeMillis();
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可操作");
@@ -169,7 +172,7 @@ public class SysRoleController {
      */
     @ApiOperation("更新角色")
     @PutMapping("/update")
-    public R<String> update(@RequestBody RoleUpdateDTO payload) {
+    public R<String> update(@Valid @RequestBody RoleUpdateDTO payload) {
         long startAt = System.currentTimeMillis();
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可操作");
@@ -202,7 +205,7 @@ public class SysRoleController {
      */
     @ApiOperation("更新角色菜单权限")
     @PutMapping("/{id}/menus")
-    public R<String> updateMenus(@PathVariable Long id, @RequestBody RoleMenuUpdateDTO payload) {
+    public R<String> updateMenus(@PathVariable Long id, @Valid @RequestBody RoleMenuUpdateDTO payload) {
         long startAt = System.currentTimeMillis();
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
             return R.fail(403, "仅管理员可操作");

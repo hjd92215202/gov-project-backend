@@ -23,10 +23,22 @@ read_env_value() {
   printf '%s' "${matched_line#*=}" | tr -d '\r'
 }
 
+ensure_required_value() {
+  local key="$1"
+  local value="$2"
+  if [ -z "${value}" ] || [ "${value}" = "CHANGE_ME" ] || [ "${value}" = "CHANGE_ME_16_CHARS" ]; then
+    echo "未配置 ${key}，请先在 /opt/gov4/backend/backend.env 中填写真实值" >&2
+    exit 1
+  fi
+}
+
 MYSQL_DATABASE_NAME=$(read_env_value "GOV_DB_NAME" "gov_db")
 MYSQL_USER_NAME=$(read_env_value "GOV_DB_USERNAME" "db_user")
-MYSQL_USER_PASSWORD=$(read_env_value "GOV_DB_PASSWORD" "Egov@123")
-MYSQL_ROOT_PASSWORD_VALUE=$(read_env_value "MYSQL_ROOT_PASSWORD" "123")
+MYSQL_USER_PASSWORD=$(read_env_value "GOV_DB_PASSWORD" "")
+MYSQL_ROOT_PASSWORD_VALUE=$(read_env_value "MYSQL_ROOT_PASSWORD" "")
+
+ensure_required_value "GOV_DB_PASSWORD" "${MYSQL_USER_PASSWORD}"
+ensure_required_value "MYSQL_ROOT_PASSWORD" "${MYSQL_ROOT_PASSWORD_VALUE}"
 
 run_client_command() {
   local sql_text="$1"
@@ -98,12 +110,12 @@ FLUSH PRIVILEGES;
 "
 
 if schema_initialized; then
-  echo "数据库结构已存在，跳过初始 SQL 导入"
+  echo "数据库结构已存在，跳过初始化 SQL 导入"
   exit 0
 fi
 
 if [ ! -f "${SQL_FILE}" ]; then
-  echo "未找到初始 SQL 文件：${SQL_FILE}" >&2
+  echo "未找到初始化 SQL 文件：${SQL_FILE}" >&2
   exit 1
 fi
 

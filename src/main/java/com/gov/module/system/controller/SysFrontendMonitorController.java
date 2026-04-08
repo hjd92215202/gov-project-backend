@@ -24,9 +24,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.validation.Valid;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -47,8 +49,10 @@ import java.util.stream.Collectors;
 @Api(tags = "前端监控")
 @RestController
 @RequestMapping("/system/frontend-monitor")
+@Validated
 public class SysFrontendMonitorController {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SysFrontendMonitorController.class);
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
     private static final int MAX_BATCH_SIZE = 50;
 
@@ -69,7 +73,7 @@ public class SysFrontendMonitorController {
      */
     @ApiOperation("上报前端监控日志")
     @PostMapping("/report")
-    public R<String> report(@RequestBody(required = false) FrontendLogReportDTO payload, HttpServletRequest request) {
+    public R<String> report(@Valid @RequestBody(required = false) FrontendLogReportDTO payload, HttpServletRequest request) {
         long startAt = System.currentTimeMillis();
         List<FrontendLogItemDTO> items = payload == null ? null : payload.getLogs();
         if (items == null || items.isEmpty()) {
@@ -300,7 +304,8 @@ public class SysFrontendMonitorController {
                 return null;
             }
             return Long.valueOf(String.valueOf(loginId));
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            LOGGER.debug("解析前端监控上报用户失败 message={}", exception.getMessage());
             return null;
         }
     }
@@ -311,7 +316,9 @@ public class SysFrontendMonitorController {
         }
         try {
             return DateUtil.parse(value.trim());
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            LOGGER.warn("解析前端监控时间失败 rawValue={} message={}，回退为当前时间",
+                    value, exception.getMessage());
             return new Date();
         }
     }

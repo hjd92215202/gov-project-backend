@@ -12,7 +12,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.util.Calendar;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
 /**
@@ -81,8 +82,6 @@ public class LogRetentionCleanupTask {
     }
 
     private Date resolveDeadline(int retainDays) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.DAY_OF_YEAR, -retainDays);
-        return calendar.getTime();
+        return Date.from(Instant.now().minus(retainDays, ChronoUnit.DAYS));
     }
 }

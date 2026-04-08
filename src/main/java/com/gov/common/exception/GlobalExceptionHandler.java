@@ -5,8 +5,10 @@ import cn.dev33.satoken.exception.NotPermissionException;
 import com.gov.common.result.R;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.BindException;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
@@ -19,7 +21,18 @@ import javax.validation.ConstraintViolationException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(BizException.class)
+    public R<String> handleBizException(BizException e) {
+        if (e.getCode() >= 500) {
+            log.error("业务处理失败 code={} message={}", e.getCode(), e.getMessage());
+        } else {
+            log.warn("业务处理失败 code={} message={}", e.getCode(), e.getMessage());
+        }
+        return R.fail(e.getCode(), e.getMessage());
+    }
+
     @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, ConstraintViolationException.class})
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<String> handleValidationException(Exception e) {
         log.warn("参数校验失败: {}", e.getMessage());
         if (e instanceof MethodArgumentNotValidException) {
@@ -44,12 +57,14 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<String> handleIllegalArgument(IllegalArgumentException e) {
         log.warn("非法参数: {}", e.getMessage());
         return R.fail(400, e.getMessage());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
     public R<String> handleMaxUploadSizeExceededException(MaxUploadSizeExceededException e) {
         long maxUploadSize = e.getMaxUploadSize();
         String readableSize = maxUploadSize > 0 ? formatFileSize(maxUploadSize) : "100MB";

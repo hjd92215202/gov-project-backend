@@ -2,6 +2,7 @@ package com.gov.module.system.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.gov.common.result.R;
+import com.gov.module.system.dto.LoginDTO;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
 import com.gov.module.system.service.SysDeptService;
@@ -15,7 +16,6 @@ import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,9 +47,9 @@ class LoginControllerTest {
      */
     @Test
     void login_shouldReturnTokenAndCurrentUserPayload() {
-        Map<String, String> payload = new HashMap<String, String>();
-        payload.put("username", "admin");
-        payload.put("password", "secret");
+        LoginDTO payload = new LoginDTO();
+        payload.setUsername("admin");
+        payload.setPassword("secret");
 
         UserAccessContext context = new UserAccessContext();
         context.setDeptId(10L);

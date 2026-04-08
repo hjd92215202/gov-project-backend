@@ -15,6 +15,8 @@ import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
 import io.minio.http.Method;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ import java.util.stream.Collectors;
 @Service
 public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> implements SysFileService {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(SysFileServiceImpl.class);
     private static final String PROJECT_FILE_DOWNLOAD_PATH_PREFIX = "/api/project/file/download/";
 
     private static final Set<String> IMAGE_EXTENSIONS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
@@ -211,8 +214,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
                     .bucket(bucketName)
                     .object(objectName)
                     .build());
-        } catch (Exception ignored) {
-            // 对象存储清理失败不应影响主流程，数据库记录仍会正常删除。
+        } catch (Exception exception) {
+            LOGGER.warn("删除 MinIO 对象失败 objectName={} message={}，将继续删除数据库记录",
+                    objectName, exception.getMessage());
         }
     }
 
@@ -286,7 +290,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             }
             String accessUrl = minioClient.getPresignedObjectUrl(builder.build());
             return minioAccessUrlBuilder.rewriteToPublicUrl(accessUrl);
-        } catch (Exception ignored) {
+        } catch (Exception exception) {
+            LOGGER.warn("生成文件访问地址失败 objectName={} message={}，回退为公共访问地址",
+                    objectName, exception.getMessage());
             return StrUtil.blankToDefault(fallbackUrl, minioAccessUrlBuilder.buildPublicObjectUrl(objectName));
         }
     }

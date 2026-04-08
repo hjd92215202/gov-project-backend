@@ -123,8 +123,9 @@ public class AuditAccessFilter extends OncePerRequestFilter {
             if (loginId != null) {
                 return String.valueOf(loginId);
             }
-        } catch (Exception ignored) {
-            // 忽略鉴权上下文读取异常，继续尝试 token 反查。
+        } catch (Exception exception) {
+            LOGGER.debug("读取当前登录上下文失败，继续尝试 token 反查 uri={} message={}",
+                    request == null ? null : request.getRequestURI(), exception.getMessage());
         }
 
         String tokenValue = extractTokenValue(request);
@@ -134,8 +135,11 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                 if (loginIdByToken != null) {
                     return String.valueOf(loginIdByToken);
                 }
-            } catch (Exception ignored) {
-                // 忽略 token 反查异常，最终回退为匿名请求。
+            } catch (Exception exception) {
+                LOGGER.debug("根据 token 反查登录用户失败 uri={} tokenPrefix={} message={}",
+                        request == null ? null : request.getRequestURI(),
+                        tokenValue.length() > 8 ? tokenValue.substring(0, 8) : tokenValue,
+                        exception.getMessage());
             }
         }
 
@@ -148,7 +152,8 @@ public class AuditAccessFilter extends OncePerRequestFilter {
         }
         try {
             return Long.parseLong(value.trim());
-        } catch (Exception ignored) {
+        } catch (NumberFormatException exception) {
+            LOGGER.debug("审计 userId 解析失败 value={} message={}", value, exception.getMessage());
             return null;
         }
     }
@@ -196,8 +201,9 @@ public class AuditAccessFilter extends OncePerRequestFilter {
             if (StrUtil.isNotBlank(configuredTokenName)) {
                 tokenName = configuredTokenName.trim();
             }
-        } catch (Exception ignored) {
-            // 忽略配置读取异常，回退到默认请求头名称。
+        } catch (Exception exception) {
+            LOGGER.debug("读取 tokenName 配置失败，回退到默认请求头 uri={} message={}",
+                    request == null ? null : request.getRequestURI(), exception.getMessage());
         }
 
         String tokenValue = request.getHeader(tokenName);

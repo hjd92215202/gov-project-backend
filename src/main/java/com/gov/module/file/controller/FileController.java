@@ -11,6 +11,8 @@ import io.minio.PutObjectArgs;
 import io.minio.http.Method;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 @RestController
 @RequestMapping("/common")
 public class FileController {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(FileController.class);
 
     @Autowired
     private MinioClient minioClient;
@@ -72,7 +76,9 @@ public class FileController {
                         .object(objectName)
                         .expiry(2, TimeUnit.HOURS)
                         .build()));
-            } catch (Exception ignored) {
+            } catch (Exception exception) {
+                LOGGER.warn("生成上传文件预签名地址失败 objectName={} message={}，回退为公共访问地址",
+                        objectName, exception.getMessage());
                 url = minioAccessUrlBuilder.buildPublicObjectUrl(objectName);
             }
             return R.ok(url, "上传成功");

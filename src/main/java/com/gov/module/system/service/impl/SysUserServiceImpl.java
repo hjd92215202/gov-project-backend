@@ -4,6 +4,7 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.gov.common.exception.BizException;
 import com.gov.crypto.PasswordCrypto;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysRole;
@@ -70,16 +71,19 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     @Override
     public String login(String username, String password) {
+        if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
+            throw new BizException(400, "用户名和密码不能为空");
+        }
         SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username.trim()));
         if (user == null) {
-            throw new RuntimeException("账号不存在");
+            throw new BizException(404, "账号不存在");
         }
         if (user.getStatus() == 0) {
-            throw new RuntimeException("账号已停用");
+            throw new BizException(403, "账号已停用");
         }
 
         if (!PasswordCrypto.matches(password, user.getUsername(), user.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BizException(401, "用户名或密码错误");
         }
 
         StpUtil.login(user.getId());

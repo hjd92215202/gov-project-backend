@@ -19,8 +19,18 @@ read_env_value() {
   printf '%s' "${matched_line#*=}" | tr -d '\r'
 }
 
-MINIO_ROOT_USER=$(read_env_value "GOV_MINIO_ACCESS_KEY" "govadmin")
-MINIO_ROOT_PASSWORD=$(read_env_value "GOV_MINIO_SECRET_KEY" "govadminpassword")
+MINIO_ROOT_USER=$(read_env_value "GOV_MINIO_ACCESS_KEY" "")
+MINIO_ROOT_PASSWORD=$(read_env_value "GOV_MINIO_SECRET_KEY" "")
+
+if [ -z "${MINIO_ROOT_USER}" ] || [ "${MINIO_ROOT_USER}" = "CHANGE_ME" ]; then
+  echo "未配置 GOV_MINIO_ACCESS_KEY，请先在 /opt/gov4/backend/backend.env 中填写真实值"
+  exit 1
+fi
+
+if [ -z "${MINIO_ROOT_PASSWORD}" ] || [ "${MINIO_ROOT_PASSWORD}" = "CHANGE_ME" ]; then
+  echo "未配置 GOV_MINIO_SECRET_KEY，请先在 /opt/gov4/backend/backend.env 中填写真实值"
+  exit 1
+fi
 
 docker network inspect gov4-net >/dev/null 2>&1 || docker network create gov4-net
 docker rm -f gov4-minio >/dev/null 2>&1 || true
@@ -36,4 +46,4 @@ docker run -d \
   minio/minio:RELEASE.2023-08-09T23-30-22Z \
   server /data --console-address ":9001"
 
-echo "MinIO 已启动：gov4-minio（对象存储仅容器内访问，控制台仅监听 127.0.0.1:9001）"
+echo "MinIO 已启动：gov4-minio（控制台仅监听 127.0.0.1:9001）"

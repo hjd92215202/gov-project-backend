@@ -17,8 +17,10 @@ import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -40,6 +42,7 @@ import java.util.stream.Collectors;
 @Api(tags = "部门管理")
 @RestController
 @RequestMapping("/system/dept")
+@Validated
 public class SysDeptController {
 
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
@@ -129,7 +132,7 @@ public class SysDeptController {
      */
     @ApiOperation("新增部门")
     @PostMapping("/add")
-    public R<String> add(@RequestBody DeptCreateDTO payload) {
+    public R<String> add(@Valid @RequestBody DeptCreateDTO payload) {
         long startAt = System.currentTimeMillis();
         SysDept dept = toCreateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {
@@ -155,7 +158,7 @@ public class SysDeptController {
      */
     @ApiOperation("更新部门")
     @PutMapping("/update")
-    public R<String> update(@RequestBody DeptUpdateDTO payload) {
+    public R<String> update(@Valid @RequestBody DeptUpdateDTO payload) {
         long startAt = System.currentTimeMillis();
         SysDept dept = toUpdateDeptEntity(payload);
         if (!sysUserService.isAdmin(StpUtil.getLoginIdAsLong())) {

@@ -24,6 +24,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -99,7 +100,7 @@ class ProjectControllerMockMvcTest {
                     .andExpect(jsonPath("$.msg").value("操作成功"));
 
             ArgumentCaptor<BizProject> captor = ArgumentCaptor.forClass(BizProject.class);
-            verify(bizProjectService).save(captor.capture());
+            verify(bizProjectService).saveProjectWithAttachments(captor.capture(), isNull());
             assertEquals("张三", captor.getValue().getLeaderName());
         }
     }

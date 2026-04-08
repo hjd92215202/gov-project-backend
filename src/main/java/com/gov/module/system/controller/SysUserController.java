@@ -25,8 +25,10 @@ import io.swagger.annotations.ApiOperation;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.validation.Valid;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +49,7 @@ import java.util.stream.Collectors;
 @Api(tags = "用户管理")
 @RestController
 @RequestMapping("/system/user")
+@Validated
 public class SysUserController {
 
     private static final Logger perfLog = LoggerFactory.getLogger("com.gov.perf");
@@ -165,7 +168,7 @@ public class SysUserController {
      */
     @ApiOperation("新增用户")
     @PostMapping("/add")
-    public R<Map<String, Object>> add(@RequestBody UserCreateDTO payload) {
+    public R<Map<String, Object>> add(@Valid @RequestBody UserCreateDTO payload) {
         long startAt = System.currentTimeMillis();
         SysUser user = toCreateUserEntity(payload);
         UserAccessContext accessContext = currentAccessContext();
@@ -224,7 +227,7 @@ public class SysUserController {
      */
     @ApiOperation("更新用户")
     @PutMapping("/update")
-    public R<String> update(@RequestBody UserUpdateDTO payload) {
+    public R<String> update(@Valid @RequestBody UserUpdateDTO payload) {
         long startAt = System.currentTimeMillis();
         SysUser user = toUpdateUserEntity(payload);
         UserAccessContext accessContext = currentAccessContext();
@@ -289,7 +292,7 @@ public class SysUserController {
      */
     @ApiOperation("更新用户状态")
     @PutMapping("/status")
-    public R<String> updateStatus(@RequestBody UserStatusUpdateDTO payload) {
+    public R<String> updateStatus(@Valid @RequestBody UserStatusUpdateDTO payload) {
         long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin() && !accessContext.isDeptLeader()) {
@@ -362,7 +365,7 @@ public class SysUserController {
      */
     @ApiOperation("设置用户角色")
     @PutMapping("/roles")
-    public R<String> setUserRoles(@RequestBody UserRoleAssignDTO payload) {
+    public R<String> setUserRoles(@Valid @RequestBody UserRoleAssignDTO payload) {
         long startAt = System.currentTimeMillis();
         UserAccessContext accessContext = currentAccessContext();
         if (!accessContext.isAdmin()) {
