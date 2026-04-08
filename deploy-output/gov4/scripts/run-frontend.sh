@@ -25,6 +25,7 @@ set -a
 set +a
 
 mkdir -p "${RUNTIME_DIR}"
+chmod 755 "${RUNTIME_DIR}"
 
 escape_js_value() {
   printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g; s/\r//g'
@@ -49,6 +50,8 @@ $(env | LC_ALL=C sort)
 EOF
   printf '\n};\n'
 } > "${RUNTIME_JS_FILE}"
+
+chmod 644 "${RUNTIME_JS_FILE}"
 
 docker network inspect gov4-net >/dev/null 2>&1 || docker network create gov4-net
 docker rm -f gov4-frontend >/dev/null 2>&1 || true
