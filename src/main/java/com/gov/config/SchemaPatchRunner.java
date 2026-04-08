@@ -8,8 +8,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 
 /**
- * 职责：在应用启动阶段补齐历史库缺失的字段与索引。
- * 补丁失败时不再静默忽略，改为 warn 日志，便于运维发现问题。
+ * 启动时补齐历史数据库缺失字段和索引。
  */
 @Component
 public class SchemaPatchRunner implements CommandLineRunner {
@@ -22,8 +21,9 @@ public class SchemaPatchRunner implements CommandLineRunner {
     @Override
     public void run(String... args) {
         safeExec("ALTER TABLE sys_role ADD COLUMN IF NOT EXISTS menu_perms VARCHAR(1000) DEFAULT NULL COMMENT '菜单权限键集合（逗号分隔）'");
-        safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_id BIGINT DEFAULT NULL COMMENT '创建人用户标识'");
-        safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_dept_id BIGINT DEFAULT NULL COMMENT '创建人部门标识'");
+        safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_id BIGINT DEFAULT NULL COMMENT '创建人用户ID'");
+        safeExec("ALTER TABLE biz_project ADD COLUMN IF NOT EXISTS creator_dept_id BIGINT DEFAULT NULL COMMENT '创建人部门ID'");
+        safeExec("ALTER TABLE sys_file ADD COLUMN IF NOT EXISTS creator_user_id BIGINT DEFAULT NULL COMMENT '临时附件上传人用户ID'");
         safeExec("CREATE TABLE IF NOT EXISTS sys_audit_log ("
                 + "id BIGINT NOT NULL,"
                 + "user_id BIGINT DEFAULT NULL,"
@@ -67,6 +67,8 @@ public class SchemaPatchRunner implements CommandLineRunner {
         ensureIndex("biz_project", "idx_biz_project_status_deleted_region", "status, deleted, province, city, district");
         ensureIndex("biz_project", "idx_biz_project_status_deleted_creator_region", "status, deleted, creator_id, province, city, district");
         ensureIndex("biz_project", "idx_biz_project_status_deleted_dept_region", "status, deleted, creator_dept_id, province, city, district");
+        ensureIndex("sys_file", "idx_sys_file_biz_id", "biz_id");
+        ensureIndex("sys_file", "idx_sys_file_creator_user_id", "creator_user_id");
         ensureIndex("sys_audit_log", "idx_sys_audit_log_time", "request_time");
         ensureIndex("sys_audit_log", "idx_sys_audit_log_user_time", "user_id, request_time");
         ensureIndex("sys_audit_log", "idx_sys_audit_log_uri_time", "request_uri, request_time");
@@ -87,29 +89,19 @@ public class SchemaPatchRunner implements CommandLineRunner {
         safeExec("UPDATE sys_role SET menu_perms = CONCAT(menu_perms, ',system:frontend-monitor') "
                 + "WHERE role_code IN ('admin','administrator','super_admin','superadmin','role_admin') "
                 + "AND menu_perms NOT LIKE '%system:frontend-monitor%'");
-        safeExec("DELETE FROM biz_project WHERE "
-                + "(id = 2 AND project_code = 'GC-002' AND project_name = '西安市莲湖区老旧改造工程') "
-                + "OR (id = 3 AND project_code = 'GC-003' AND project_name = '咸阳市某桥梁项目')");
 
         log.info("SchemaPatchRunner 执行完毕");
     }
 
-    /**
-     * 安全执行单条 SQL。
-     * 补丁失败时输出 warn 日志，不再静默忽略，便于运维发现问题。
-     */
     private void safeExec(String sql) {
         try {
             jdbcTemplate.execute(sql);
-        } catch (Exception e) {
+        } catch (Exception exception) {
             log.warn("SchemaPatch 执行失败（可忽略重复补丁）: {} | error: {}",
-                    sql.length() > 120 ? sql.substring(0, 120) + "..." : sql, e.getMessage());
+                    sql.length() > 120 ? sql.substring(0, 120) + "..." : sql, exception.getMessage());
         }
     }
 
-    /**
-     * 幂等补齐索引。先查 information_schema，只有索引缺失时才创建。
-     */
     private void ensureIndex(String tableName, String indexName, String columns) {
         try {
             Integer count = jdbcTemplate.queryForObject(
@@ -121,8 +113,8 @@ public class SchemaPatchRunner implements CommandLineRunner {
             }
             jdbcTemplate.execute("CREATE INDEX " + indexName + " ON " + tableName + "(" + columns + ")");
             log.info("SchemaPatch 创建索引成功: {}.{}", tableName, indexName);
-        } catch (Exception e) {
-            log.warn("SchemaPatch 创建索引失败: {}.{} | error: {}", tableName, indexName, e.getMessage());
+        } catch (Exception exception) {
+            log.warn("SchemaPatch 创建索引失败: {}.{} | error: {}", tableName, indexName, exception.getMessage());
         }
     }
 }

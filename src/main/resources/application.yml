@@ -56,7 +56,16 @@ sa-token:
   timeout: 2592000
   is-concurrent: true
   is-share: true
+  is-read-body: false
+  is-read-header: false
+  is-read-cookie: true
+  is-write-header: false
   token-style: uuid
+  cookie:
+    path: /
+    http-only: true
+    same-site: Lax
+    secure: ${GOV_AUTH_COOKIE_SECURE:false}
 
 minio:
   endpoint: ${GOV_MINIO_ENDPOINT:http://127.0.0.1:9000}
@@ -90,10 +99,17 @@ logging:
     com.gov.audit: INFO
 
 gov:
+  api-docs:
+    enabled: ${GOV_API_DOCS_ENABLED:false}
   file:
     temp-retain-hours: 24
     temp-cleanup-cron: 0 0 4 * * ?
   security:
+    trusted-proxies: ${GOV_TRUSTED_PROXY_SOURCES:}
+    csrf:
+      enabled: ${GOV_CSRF_ENABLED:true}
+      cookie-name: ${GOV_CSRF_COOKIE_NAME:XSRF-TOKEN}
+      header-name: ${GOV_CSRF_HEADER_NAME:X-CSRF-Token}
     sm4:
       key: ${GOV_SM4_KEY:}
       enabled: ${GOV_SM4_ENABLED:true}

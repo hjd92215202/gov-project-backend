@@ -48,10 +48,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -72,6 +75,9 @@ public class ProjectController {
     private static final BigDecimal LONGITUDE_MAX = new BigDecimal("180");
     private static final BigDecimal LATITUDE_MIN = new BigDecimal("-90");
     private static final BigDecimal LATITUDE_MAX = new BigDecimal("90");
+    private static final Set<String> SAFE_INLINE_PREVIEW_EXTENSIONS = new HashSet<String>(
+            Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "webp")
+    );
 
     @Autowired
     private BizProjectService bizProjectService;
@@ -156,37 +162,36 @@ public class ProjectController {
         return R.ok(sysFileService.uploadProjectFile(file), "Upload success");
     }
 
+    @ApiOperation("Preview project attachment")
+    @GetMapping("/file/preview/{id}")
+    public void previewProjectFile(@PathVariable Long id, HttpServletResponse response) throws IOException {
+        SysFile file = loadAccessibleFile(id, response);
+        if (file == null) {
+            return;
+        }
+        if (!isSafeInlinePreview(file)) {
+            response.sendError(HttpServletResponse.SC_UNSUPPORTED_MEDIA_TYPE, "Attachment preview is not supported");
+            return;
+        }
+
+        response.reset();
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(resolveInlinePreviewContentType(file.getFileType(), file.getFileName()));
+        response.setHeader("Content-Disposition", "inline");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        if (file.getFileSize() != null && file.getFileSize() >= 0) {
+            response.setContentLengthLong(file.getFileSize());
+        }
+
+        streamFile(file, id, response, "Attachment preview failed");
+    }
+
     @ApiOperation("Download project attachment")
     @GetMapping("/file/download/{id}")
     public void downloadProjectFile(@PathVariable Long id, HttpServletResponse response) throws IOException {
-        if (id == null) {
-            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Attachment id is required");
-            return;
-        }
-
-        SysFile file = sysFileService.getById(id);
+        SysFile file = loadAccessibleFile(id, response);
         if (file == null) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment not found");
             return;
-        }
-        if (StrUtil.isBlank(file.getFilePath())) {
-            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment object path is missing");
-            return;
-        }
-
-        if (file.getBizId() != null) {
-            BizProject project = bizProjectService.getById(file.getBizId());
-            if (project == null) {
-                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Project not found");
-                return;
-            }
-            if (!canOperateProject(project, currentAccessContext())) {
-                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
-                return;
-            }
-        } else {
-            // Keep temporary attachments downloadable inside the project edit flow.
-            StpUtil.getLoginIdAsLong();
         }
 
         response.reset();
@@ -198,20 +203,7 @@ public class ProjectController {
             response.setContentLengthLong(file.getFileSize());
         }
 
-        try (GetObjectResponse objectStream = minioClient.getObject(GetObjectArgs.builder()
-                .bucket(bucketName)
-                .object(file.getFilePath())
-                .build())) {
-            StreamUtils.copy(objectStream, response.getOutputStream());
-            response.flushBuffer();
-        } catch (Exception e) {
-            if (!response.isCommitted()) {
-                response.reset();
-                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Attachment download failed");
-                return;
-            }
-            throw new IllegalStateException("Failed to stream project attachment: " + id, e);
-        }
+        streamFile(file, id, response, "Attachment download failed");
     }
 
     @ApiOperation("Cleanup temporary project attachments")
@@ -950,6 +942,100 @@ public class ProjectController {
             }
         }
         return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    }
+
+    private String resolveInlinePreviewContentType(String fileType, String fileName) {
+        String normalizedType = StrUtil.trimToEmpty(fileType).toLowerCase();
+        if ("image/jpeg".equals(normalizedType) || "image/png".equals(normalizedType)
+                || "image/gif".equals(normalizedType) || "image/bmp".equals(normalizedType)
+                || "image/webp".equals(normalizedType)) {
+            return normalizedType;
+        }
+        String suffix = StrUtil.trimToEmpty(cn.hutool.core.io.FileUtil.getSuffix(fileName)).toLowerCase();
+        if ("jpg".equals(suffix) || "jpeg".equals(suffix)) {
+            return MediaType.IMAGE_JPEG_VALUE;
+        }
+        if ("png".equals(suffix)) {
+            return MediaType.IMAGE_PNG_VALUE;
+        }
+        if ("gif".equals(suffix)) {
+            return MediaType.IMAGE_GIF_VALUE;
+        }
+        if ("bmp".equals(suffix)) {
+            return "image/bmp";
+        }
+        if ("webp".equals(suffix)) {
+            return "image/webp";
+        }
+        return MediaType.APPLICATION_OCTET_STREAM_VALUE;
+    }
+
+    private SysFile loadAccessibleFile(Long id, HttpServletResponse response) throws IOException {
+        if (id == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Attachment id is required");
+            return null;
+        }
+
+        SysFile file = sysFileService.getById(id);
+        if (file == null) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment not found");
+            return null;
+        }
+        if (StrUtil.isBlank(file.getFilePath())) {
+            response.sendError(HttpServletResponse.SC_NOT_FOUND, "Attachment object path is missing");
+            return null;
+        }
+
+        if (file.getBizId() != null) {
+            BizProject project = bizProjectService.getById(file.getBizId());
+            if (project == null) {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Project not found");
+                return null;
+            }
+            if (!canOperateProject(project, currentAccessContext())) {
+                response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+                return null;
+            }
+            return file;
+        }
+
+        Long currentUserId = StpUtil.getLoginIdAsLong();
+        if (!Objects.equals(file.getCreatorUserId(), currentUserId)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Access denied");
+            return null;
+        }
+        return file;
+    }
+
+    private void streamFile(SysFile file, Long id, HttpServletResponse response, String errorMessage) throws IOException {
+        try (GetObjectResponse objectStream = minioClient.getObject(GetObjectArgs.builder()
+                .bucket(bucketName)
+                .object(file.getFilePath())
+                .build())) {
+            StreamUtils.copy(objectStream, response.getOutputStream());
+            response.flushBuffer();
+        } catch (Exception exception) {
+            if (!response.isCommitted()) {
+                response.reset();
+                response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, errorMessage);
+                return;
+            }
+            throw new IllegalStateException("Failed to stream project attachment: " + id, exception);
+        }
+    }
+
+    private boolean isSafeInlinePreview(SysFile file) {
+        if (file == null) {
+            return false;
+        }
+        String normalizedType = StrUtil.trimToEmpty(file.getFileType()).toLowerCase();
+        if ("image/jpeg".equals(normalizedType) || "image/png".equals(normalizedType)
+                || "image/gif".equals(normalizedType) || "image/bmp".equals(normalizedType)
+                || "image/webp".equals(normalizedType)) {
+            return true;
+        }
+        String suffix = StrUtil.trimToEmpty(cn.hutool.core.io.FileUtil.getSuffix(file.getFileName())).toLowerCase();
+        return SAFE_INLINE_PREVIEW_EXTENSIONS.contains(suffix);
     }
 
     private UserAccessContext currentAccessContext() {

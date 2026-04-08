@@ -2,6 +2,7 @@ package com.gov.common.filter;
 
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
+import com.gov.common.security.ClientIpResolver;
 import com.gov.module.system.entity.SysAuditLog;
 import com.gov.module.system.service.SysAuditLogService;
 import org.slf4j.Logger;
@@ -16,15 +17,14 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.Date;
 
 /**
- * 职责：记录接口访问审计信息，并输出慢请求观测日志。
- * 为什么存在：审计日志要完整，但不能牺牲用户点击后的主链路响应时间，
- * 因此这里改为“同步采集 + 异步落库”模式。
+ * 记录接口访问审计信息并输出慢请求观测日志。
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
@@ -38,6 +38,9 @@ public class AuditAccessFilter extends OncePerRequestFilter {
 
     @Autowired(required = false)
     private SysAuditLogService sysAuditLogService;
+
+    @Autowired(required = false)
+    private ClientIpResolver clientIpResolver;
 
     @Value("${gov.logging.slow-request-ms:800}")
     private long slowRequestThresholdMs;
@@ -56,7 +59,6 @@ public class AuditAccessFilter extends OncePerRequestFilter {
         String method = request.getMethod();
         String uri = request.getRequestURI();
 
-        // 先把 userId 固化到请求属性，避免后续鉴权上下文被清理后无法追溯操作人。
         String resolvedUserId = resolveUserId(request);
         if (StrUtil.isNotBlank(resolvedUserId) && !"anonymous".equals(resolvedUserId)) {
             request.setAttribute(AUDIT_USER_ID_ATTR, resolvedUserId);
@@ -124,14 +126,17 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                 return String.valueOf(loginId);
             }
         } catch (Exception exception) {
-            LOGGER.debug("读取当前登录上下文失败，继续尝试 token 反查 uri={} message={}",
+            LOGGER.debug("读取当前登录上下文失败，继续尝试 Cookie 反查 uri={} message={}",
                     request == null ? null : request.getRequestURI(), exception.getMessage());
         }
 
         String tokenValue = extractTokenValue(request);
         if (StrUtil.isNotBlank(tokenValue)) {
             try {
-                Object loginIdByToken = StpUtil.getLoginIdByToken(tokenValue);
+                String normalizedTokenValue = tokenValue.startsWith("Bearer ")
+                        ? tokenValue.substring("Bearer ".length()).trim()
+                        : tokenValue;
+                Object loginIdByToken = StpUtil.getLoginIdByToken(normalizedTokenValue);
                 if (loginIdByToken != null) {
                     return String.valueOf(loginIdByToken);
                 }
@@ -158,31 +163,6 @@ public class AuditAccessFilter extends OncePerRequestFilter {
         }
     }
 
-    private String resolveClientIp(HttpServletRequest request) {
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (StrUtil.isNotBlank(xForwardedFor)) {
-            String firstIp = xForwardedFor.split(",")[0].trim();
-            if (StrUtil.isNotBlank(firstIp)) {
-                return firstIp;
-            }
-        }
-        String[] headerCandidates = {
-                "X-Real-IP",
-                "Proxy-Client-IP",
-                "WL-Proxy-Client-IP",
-                "HTTP_CLIENT_IP",
-                "HTTP_X_FORWARDED_FOR"
-        };
-        for (String header : headerCandidates) {
-            String value = request.getHeader(header);
-            if (StrUtil.isNotBlank(value) && !"unknown".equalsIgnoreCase(value.trim())) {
-                return value.trim();
-            }
-        }
-        String remoteAddr = request.getRemoteAddr();
-        return StrUtil.isBlank(remoteAddr) ? "unknown" : remoteAddr.trim();
-    }
-
     private String truncate(String value, int maxLength) {
         if (StrUtil.isBlank(value)) {
             return value;
@@ -194,7 +174,28 @@ public class AuditAccessFilter extends OncePerRequestFilter {
         return text.substring(0, maxLength);
     }
 
+    private String resolveClientIp(HttpServletRequest request) {
+        if (clientIpResolver != null) {
+            return clientIpResolver.resolveClientIp(request);
+        }
+        if (request == null) {
+            return "unknown";
+        }
+        String forwardedFor = StrUtil.trimToNull(request.getHeader("X-Forwarded-For"));
+        if (StrUtil.isNotBlank(forwardedFor)) {
+            return forwardedFor.split(",")[0].trim();
+        }
+        String realIp = StrUtil.trimToNull(request.getHeader("X-Real-IP"));
+        if (StrUtil.isNotBlank(realIp)) {
+            return realIp;
+        }
+        return StrUtil.blankToDefault(StrUtil.trimToEmpty(request.getRemoteAddr()), "unknown");
+    }
+
     private String extractTokenValue(HttpServletRequest request) {
+        if (request == null) {
+            return null;
+        }
         String tokenName = "Authorization";
         try {
             String configuredTokenName = StpUtil.getTokenName();
@@ -202,28 +203,26 @@ public class AuditAccessFilter extends OncePerRequestFilter {
                 tokenName = configuredTokenName.trim();
             }
         } catch (Exception exception) {
-            LOGGER.debug("读取 tokenName 配置失败，回退到默认请求头 uri={} message={}",
+            LOGGER.debug("读取 tokenName 配置失败，回退到默认 token 名 uri={} message={}",
                     request == null ? null : request.getRequestURI(), exception.getMessage());
         }
 
-        String tokenValue = request.getHeader(tokenName);
-        if (StrUtil.isBlank(tokenValue)) {
-            tokenValue = request.getHeader("Authorization");
+        String headerToken = StrUtil.trimToNull(request.getHeader(tokenName));
+        if (headerToken == null) {
+            headerToken = StrUtil.trimToNull(request.getHeader("Authorization"));
         }
-        if (StrUtil.isBlank(tokenValue)) {
-            tokenValue = request.getParameter(tokenName);
-        }
-        if (StrUtil.isBlank(tokenValue)) {
-            tokenValue = request.getParameter("Authorization");
-        }
-        if (StrUtil.isBlank(tokenValue)) {
-            return null;
+        if (headerToken != null) {
+            return headerToken;
         }
 
-        tokenValue = tokenValue.trim();
-        if (tokenValue.startsWith("Bearer ")) {
-            tokenValue = tokenValue.substring("Bearer ".length()).trim();
+        if (request.getCookies() == null) {
+            return null;
         }
-        return tokenValue;
+        for (Cookie cookie : request.getCookies()) {
+            if (cookie != null && tokenName.equals(cookie.getName())) {
+                return StrUtil.trimToNull(cookie.getValue());
+            }
+        }
+        return null;
     }
 }

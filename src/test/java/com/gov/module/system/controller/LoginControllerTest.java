@@ -24,12 +24,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
 
-/**
- * 职责：验证登录控制器的纯业务组装逻辑。
- * 为什么存在：这层测试不依赖 MockMvc，更适合快速保护 token、部门名和菜单等组装结果。
- * 关键输入输出：输入为登录参数或当前登录态，输出为 `R<Map<String, Object>>`。
- * 关联链路：登录页成功跳转、会话刷新、首页路由解析。
- */
 @ExtendWith(MockitoExtension.class)
 class LoginControllerTest {
 
@@ -42,11 +36,8 @@ class LoginControllerTest {
     @Mock
     private SysDeptService sysDeptService;
 
-    /**
-     * 作用：验证登录返回会携带前端初始化所需的完整字段。
-     */
     @Test
-    void login_shouldReturnTokenAndCurrentUserPayload() {
+    void login_shouldReturnCurrentUserPayload() {
         LoginDTO payload = new LoginDTO();
         payload.setUsername("admin");
         payload.setPassword("secret");
@@ -76,16 +67,12 @@ class LoginControllerTest {
             R<Map<String, Object>> result = controller.login(payload);
 
             assertEquals(Integer.valueOf(200), result.getCode());
-            assertEquals("token-1", result.getData().get("tokenValue"));
-            assertEquals("Authorization", result.getData().get("tokenName"));
+            assertFalse(result.getData().containsKey("tokenValue"));
             assertEquals("综合管理部", result.getData().get("deptName"));
             assertEquals(Arrays.asList("admin", "user"), result.getData().get("roleCodes"));
         }
     }
 
-    /**
-     * 作用：验证 `/me` 返回不会包含 token 字段，但会保留角色和菜单信息。
-     */
     @Test
     void me_shouldReturnPayloadWithoutTokenFields() {
         UserAccessContext context = new UserAccessContext();

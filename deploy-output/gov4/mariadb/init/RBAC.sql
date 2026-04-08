@@ -83,12 +83,15 @@ CREATE TABLE biz_project (
 CREATE TABLE sys_file (
     id BIGINT NOT NULL COMMENT '主键',
     biz_id BIGINT DEFAULT NULL COMMENT '业务ID',
+    creator_user_id BIGINT DEFAULT NULL COMMENT '临时附件上传人用户ID',
     file_name VARCHAR(255) DEFAULT NULL COMMENT '文件原始名称',
     file_path VARCHAR(500) DEFAULT NULL COMMENT '文件存储路径',
     file_type VARCHAR(50) DEFAULT NULL COMMENT '文件类型',
     file_size BIGINT DEFAULT NULL COMMENT '文件大小（字节）',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    KEY idx_sys_file_biz_id (biz_id),
+    KEY idx_sys_file_creator_user_id (creator_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='文件表';
 
 CREATE TABLE sys_audit_log (

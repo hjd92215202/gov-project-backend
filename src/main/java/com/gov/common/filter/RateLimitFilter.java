@@ -1,7 +1,9 @@
 package com.gov.common.filter;
 
+import com.gov.common.security.ClientIpResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -16,9 +18,7 @@ import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 职责：基于令牌桶算法对每个 IP 进行限流，防止单个客户端打满服务。
- * 为什么存在：100 人并发场景下，若某个客户端异常重试或恶意刷接口，
- * 会挤占其他用户的连接池和线程资源，需要在入口层做第一道防护。
+ * 基于客户端 IP 的令牌桶限流。
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 5)
@@ -35,7 +35,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
     @Value("${gov.rate-limit.burst-capacity:60}")
     private int burstCapacity;
 
-    // IP -> [tokens, lastRefillTime]
+    @Autowired
+    private ClientIpResolver clientIpResolver;
+
     private final ConcurrentHashMap<String, long[]> buckets = new ConcurrentHashMap<String, long[]>();
 
     @Override
@@ -44,14 +46,13 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return true;
         }
         String uri = request.getRequestURI();
-        // 健康检查不限流
         return uri != null && (uri.contains("/health/live") || uri.contains("/health/ready"));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String ip = resolveClientIp(request);
+        String ip = clientIpResolver.resolveClientIp(request);
         if (!tryAcquire(ip)) {
             log.warn("限流触发 ip={} uri={}", ip, request.getRequestURI());
             response.setStatus(429);
@@ -64,11 +65,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private boolean tryAcquire(String ip) {
         long now = System.currentTimeMillis();
-        long[] bucket = buckets.computeIfAbsent(ip, k -> new long[]{burstCapacity, now});
+        long[] bucket = buckets.computeIfAbsent(ip, key -> new long[]{burstCapacity, now});
 
         synchronized (bucket) {
             long elapsed = now - bucket[1];
-            // 按时间补充令牌
             long refill = (long) (elapsed / 1000.0 * maxRequestsPerSecond);
             if (refill > 0) {
                 bucket[0] = Math.min(burstCapacity, bucket[0] + refill);
@@ -80,17 +80,5 @@ public class RateLimitFilter extends OncePerRequestFilter {
             }
             return false;
         }
-    }
-
-    private String resolveClientIp(HttpServletRequest request) {
-        String xff = request.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isEmpty()) {
-            return xff.split(",")[0].trim();
-        }
-        String xri = request.getHeader("X-Real-IP");
-        if (xri != null && !xri.isEmpty()) {
-            return xri.trim();
-        }
-        return request.getRemoteAddr();
     }
 }

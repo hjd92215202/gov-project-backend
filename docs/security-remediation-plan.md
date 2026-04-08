@@ -1,28 +1,40 @@
-# 安全规范整改实施计划
+# 后端安全整改实施计划
 
 ## 背景
-本轮整改是在后端已经存在半成品改动的基础上续做，不回滚已有修改，重点把未闭环的安全与规范改造收口，并同步刷新交付包。
+本轮是在已有半成品整改基础上继续收口，不回滚已落地的 `BizException`、启动期安全配置校验、DTO Bean Validation、`@Validated/@Valid` 接入和部分异常治理。
+
+## 规范来源
+- `JAVA语言安全编程规范.txt`
+- `JAVA编程规范`
+- 本轮追加的真实漏洞收口要求：Cookie 会话、CSRF、防止附件公开直链、密码哈希升级、可信代理 IP、Swagger 默认关闭
 
 ## 已接管的半成品改动
-- 已引入 `BizException`
-- 已新增 `SecurityConfigurationValidator`
-- 已新增 DTO 校验常量、`LoginDTO`、`FlowApproveDTO`
-- 已在登录、审批、项目、用户、部门、角色、前端监控等入口补充 `@Validated` / `@Valid`
-- 已在 `application.yml` 去除数据库密码、MinIO 凭据、SM4 key 的默认演示值
-- 已将多处裸 `RuntimeException` 替换为 `BizException`
-- 已将一批静默吞异常、`Calendar` 调用和坐标校验问题纳入收口
+- 新增 `BizException`
+- 新增 `SecurityConfigurationValidator`
+- 去掉 `application.yml` 中数据库密码、MinIO 凭据、SM4 key 的演示默认值
+- 登录、审批及多类 DTO 已补 Bean Validation
+- 控制器已开始串接 `@Validated` / `@Valid`
 
-## 本轮收口项
-- 保持 `SysUser.password` 字段数据库映射不变，仅通过 `@JsonIgnore` 禁止 JSON 序列化
-- 继续清理静默异常，统一为“记录上下文日志 + 合理降级”
-- 新增最小门禁脚本，扫描敏感默认值、`throw new RuntimeException`、`catch (Exception ignored)`
-- 清理部署链路默认口令，包括 `backend.env.example`、`run-mariadb.sh`、`run-minio.sh`
-- 更新部署说明，明确环境变量必填策略和缺失时的失败行为
-- 刷新交付包，并将源码、文档、交付产物统一纳入提交
+## 本轮整改范围
+- 认证主链切换为 `HttpOnly Cookie`
+- 新增双提交 Cookie CSRF 校验
+- 删除 `/common/upload` 通用上传口
+- 项目附件改为后端受控预览/下载
+- 临时附件绑定、下载、清理增加上传人归属限制
+- 密码从历史 SM3 平滑迁移到 BCrypt
+- 统一客户端 IP 解析，仅信任可信代理转发头
+- Swagger/Knife4j 改为配置驱动，部署默认关闭
+- 更新部署模板、门禁脚本、数据库初始化脚本、备份脚本和整改报告
+
+## 本轮约束
+- 不改变现有页面 UI、交互和用户体验
+- 不回滚工作区已有后端改动
+- 部署模板和交付包必须反映新安全行为
+- 所有源码和文档按 UTF-8 保存
 
 ## 验证计划
-- 运行 `powershell -ExecutionPolicy Bypass -File scripts/security-remediation-check.ps1`
-- 运行 `powershell -ExecutionPolicy Bypass -File scripts/mvn-jdk8.ps1 test`
-- 运行 `powershell -ExecutionPolicy Bypass -File scripts/mvn-jdk8.ps1 -DskipTests clean package`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\security-remediation-check.ps1`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\mvn-jdk8.ps1 test`
+- `powershell -ExecutionPolicy Bypass -File .\scripts\mvn-jdk8.ps1 -q -DskipTests clean package`
 - 刷新 `deploy-output/gov4`
-- 更新整改报告，记录验证结论与剩余风险
+- 更新整改报告中的门禁结果、构建结果、交付包位置和 commit

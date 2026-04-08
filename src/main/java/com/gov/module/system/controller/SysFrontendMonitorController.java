@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.gov.common.result.R;
+import com.gov.common.security.ClientIpResolver;
 import com.gov.module.system.dto.FrontendLogItemDTO;
 import com.gov.module.system.dto.FrontendLogReportDTO;
 import com.gov.module.system.entity.SysDept;
@@ -64,6 +65,9 @@ public class SysFrontendMonitorController {
 
     @Autowired
     private SysDeptService sysDeptService;
+
+    @Autowired(required = false)
+    private ClientIpResolver clientIpResolver;
 
     /**
      * 职责：接收浏览器侧批量上报的运行监控日志。
@@ -331,19 +335,11 @@ public class SysFrontendMonitorController {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
+        if (clientIpResolver != null) {
+            return clientIpResolver.resolveClientIp(request);
+        }
         if (request == null) {
             return "unknown";
-        }
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (StrUtil.isNotBlank(xForwardedFor)) {
-            String firstIp = xForwardedFor.split(",")[0].trim();
-            if (StrUtil.isNotBlank(firstIp)) {
-                return firstIp;
-            }
-        }
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (StrUtil.isNotBlank(xRealIp)) {
-            return xRealIp.trim();
         }
         String remoteAddr = request.getRemoteAddr();
         return StrUtil.isBlank(remoteAddr) ? "unknown" : remoteAddr.trim();

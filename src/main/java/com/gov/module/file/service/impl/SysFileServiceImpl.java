@@ -1,5 +1,6 @@
 package com.gov.module.file.service.impl;
 
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
@@ -7,14 +8,11 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.gov.module.file.entity.SysFile;
 import com.gov.module.file.mapper.SysFileMapper;
 import com.gov.module.file.service.SysFileService;
-import com.gov.module.file.support.MinioAccessUrlBuilder;
 import com.gov.module.project.dto.ProjectAttachmentDTO;
 import com.gov.module.project.vo.ProjectFileVO;
-import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
-import io.minio.http.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,32 +28,25 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
- * 文件服务实现。
- * 这里把对象存储和数据库元数据管理放在一起，
- * 避免控制器层散落文件上传、签名地址和绑定关系逻辑。
+ * 项目附件服务实现。
  */
 @Service
 public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> implements SysFileService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SysFileServiceImpl.class);
+    private static final String PROJECT_FILE_PREVIEW_PATH_PREFIX = "/api/project/file/preview/";
     private static final String PROJECT_FILE_DOWNLOAD_PATH_PREFIX = "/api/project/file/download/";
-
-    private static final Set<String> IMAGE_EXTENSIONS = Collections.unmodifiableSet(new HashSet<String>(Arrays.asList(
-            "jpg", "jpeg", "png", "gif", "bmp", "webp", "svg"
-    )));
+    private static final Set<String> SAFE_INLINE_IMAGE_EXTENSIONS = Collections.unmodifiableSet(
+            new HashSet<String>(Arrays.asList("jpg", "jpeg", "png", "gif", "bmp", "webp"))
+    );
 
     @Autowired
     private MinioClient minioClient;
-
-    @Autowired
-    private MinioAccessUrlBuilder minioAccessUrlBuilder;
 
     @Value("${minio.bucket-name}")
     private String bucketName;
@@ -75,12 +66,13 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
                     .stream(file.getInputStream(), file.getSize(), -1)
                     .contentType(file.getContentType())
                     .build());
-        } catch (Exception e) {
-            throw new IllegalStateException("文件上传失败：" + e.getMessage(), e);
+        } catch (Exception exception) {
+            throw new IllegalStateException("文件上传失败", exception);
         }
 
         SysFile sysFile = new SysFile();
         sysFile.setBizId(null);
+        sysFile.setCreatorUserId(currentUserId());
         sysFile.setFileName(originalFileName);
         sysFile.setFilePath(objectName);
         sysFile.setFileType(resolveFileType(file, originalFileName));
@@ -106,13 +98,14 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         if (projectId == null) {
             return;
         }
+        Long currentUserId = currentUserId();
 
         Set<Long> targetIds = attachments == null
                 ? new LinkedHashSet<Long>()
                 : attachments.stream()
                 .map(ProjectAttachmentDTO::getId)
                 .filter(Objects::nonNull)
-                .collect(Collectors.toCollection(LinkedHashSet<Long>::new));
+                .collect(Collectors.toCollection(LinkedHashSet::new));
 
         List<SysFile> currentFiles = lambdaQuery()
                 .eq(SysFile::getBizId, projectId)
@@ -129,6 +122,9 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
             for (SysFile file : targetFiles) {
                 if (file.getBizId() != null && !Objects.equals(file.getBizId(), projectId)) {
                     throw new IllegalArgumentException("存在已绑定其他项目的附件，请刷新页面后重试");
+                }
+                if (file.getBizId() == null && !Objects.equals(file.getCreatorUserId(), currentUserId)) {
+                    throw new IllegalArgumentException("只能绑定本人上传的临时附件");
                 }
             }
             List<SysFile> needBindFiles = targetFiles.stream()
@@ -171,6 +167,7 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         List<SysFile> files = lambdaQuery()
                 .in(SysFile::getId, fileIds)
                 .isNull(SysFile::getBizId)
+                .eq(SysFile::getCreatorUserId, currentUserId())
                 .list();
         if (files.isEmpty()) {
             return 0;
@@ -226,8 +223,8 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         vo.setFileName(file.getFileName());
         vo.setFileType(file.getFileType());
         vo.setFileSize(file.getFileSize());
-        vo.setImage(isImageFile(file.getFileType(), file.getFileName()));
-        String previewUrl = buildPreviewUrl(file.getFilePath());
+        vo.setImage(isSafeInlineImage(file.getFileType(), file.getFileName()));
+        String previewUrl = buildPreviewUrl(file.getId());
         vo.setPreviewUrl(previewUrl);
         vo.setDownloadUrl(buildDownloadUrl(file.getId()));
         vo.setAccessUrl(previewUrl);
@@ -256,16 +253,22 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         return StrUtil.isNotBlank(suffix) ? suffix.toLowerCase() : "application/octet-stream";
     }
 
-    private boolean isImageFile(String fileType, String fileName) {
-        if (StrUtil.startWithIgnoreCase(fileType, "image/")) {
+    private boolean isSafeInlineImage(String fileType, String fileName) {
+        String normalizedType = StrUtil.trimToEmpty(fileType).toLowerCase();
+        if ("image/jpeg".equals(normalizedType) || "image/png".equals(normalizedType)
+                || "image/gif".equals(normalizedType) || "image/bmp".equals(normalizedType)
+                || "image/webp".equals(normalizedType)) {
             return true;
         }
         String suffix = FileUtil.getSuffix(fileName);
-        return StrUtil.isNotBlank(suffix) && IMAGE_EXTENSIONS.contains(suffix.toLowerCase());
+        return StrUtil.isNotBlank(suffix) && SAFE_INLINE_IMAGE_EXTENSIONS.contains(suffix.toLowerCase());
     }
 
-    private String buildPreviewUrl(String objectName) {
-        return buildAccessUrl(objectName, null, null);
+    private String buildPreviewUrl(Long fileId) {
+        if (fileId == null) {
+            return "";
+        }
+        return PROJECT_FILE_PREVIEW_PATH_PREFIX + fileId;
     }
 
     private String buildDownloadUrl(Long fileId) {
@@ -275,25 +278,11 @@ public class SysFileServiceImpl extends ServiceImpl<SysFileMapper, SysFile> impl
         return PROJECT_FILE_DOWNLOAD_PATH_PREFIX + fileId;
     }
 
-    private String buildAccessUrl(String objectName, Map<String, String> extraQueryParams, String fallbackUrl) {
-        if (StrUtil.isBlank(objectName)) {
-            return "";
-        }
+    private Long currentUserId() {
         try {
-            GetPresignedObjectUrlArgs.Builder builder = GetPresignedObjectUrlArgs.builder()
-                    .method(Method.GET)
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .expiry(2, TimeUnit.HOURS);
-            if (extraQueryParams != null && !extraQueryParams.isEmpty()) {
-                builder.extraQueryParams(extraQueryParams);
-            }
-            String accessUrl = minioClient.getPresignedObjectUrl(builder.build());
-            return minioAccessUrlBuilder.rewriteToPublicUrl(accessUrl);
+            return StpUtil.getLoginIdAsLong();
         } catch (Exception exception) {
-            LOGGER.warn("生成文件访问地址失败 objectName={} message={}，回退为公共访问地址",
-                    objectName, exception.getMessage());
-            return StrUtil.blankToDefault(fallbackUrl, minioAccessUrlBuilder.buildPublicObjectUrl(objectName));
+            throw new IllegalStateException("当前登录信息无效", exception);
         }
     }
 }

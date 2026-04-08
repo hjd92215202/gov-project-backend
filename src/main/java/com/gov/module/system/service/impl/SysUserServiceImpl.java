@@ -37,23 +37,20 @@ import java.util.stream.Collectors;
 
 /**
  * 用户服务实现。
- * 这一层除了基础用户读写，还额外承担登录校验、角色标准化、菜单聚合和访问上下文构建，
- * 是整个权限链路里最核心的汇总点之一。
  */
 @Service
 public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
 
     private static final String ACCESS_CONTEXT_REQUEST_ATTR = SysUserServiceImpl.class.getName() + ".ACCESS_CONTEXT";
+    private static final String INVALID_LOGIN_MESSAGE = "用户名或密码错误";
 
-    /** 普通用户默认菜单。 */
     private static final List<String> USER_DEFAULT_MENUS = Arrays.asList("project:manage");
-    /** 部门负责人默认菜单。 */
     private static final List<String> DEPT_LEADER_DEFAULT_MENUS = Arrays.asList(
             "project:manage", "project:engineering", "system:user", "system:dept"
     );
-    /** 管理员默认菜单。 */
     private static final List<String> ADMIN_DEFAULT_MENUS = Arrays.asList(
-            "dashboard:view", "project:manage", "project:engineering", "system:user", "system:dept", "system:role", "system:audit", "system:frontend-monitor"
+            "dashboard:view", "project:manage", "project:engineering", "system:user",
+            "system:dept", "system:role", "system:audit", "system:frontend-monitor"
     );
 
     @Autowired
@@ -65,63 +62,60 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     @Autowired
     private SysDeptService sysDeptService;
 
-    /**
-     * 执行登录校验。
-     * 这里除了校验密码，还会检查启停状态，并在成功后交给 Sa-Token 建立登录态。
-     */
     @Override
     public String login(String username, String password) {
         if (StrUtil.isBlank(username) || StrUtil.isBlank(password)) {
             throw new BizException(400, "用户名和密码不能为空");
         }
+
         SysUser user = this.getOne(new LambdaQueryWrapper<SysUser>().eq(SysUser::getUsername, username.trim()));
-        if (user == null) {
-            throw new BizException(404, "账号不存在");
-        }
-        if (user.getStatus() == 0) {
-            throw new BizException(403, "账号已停用");
+        if (user == null || user.getStatus() == null || user.getStatus() == 0) {
+            throw new BizException(401, INVALID_LOGIN_MESSAGE);
         }
 
         if (!PasswordCrypto.matches(password, user.getUsername(), user.getPassword())) {
-            throw new BizException(401, "用户名或密码错误");
+            throw new BizException(401, INVALID_LOGIN_MESSAGE);
+        }
+
+        if (PasswordCrypto.needsUpgrade(user.getPassword())) {
+            SysUser passwordUpdate = new SysUser();
+            passwordUpdate.setId(user.getId());
+            passwordUpdate.setPassword(PasswordCrypto.encode(password, user.getUsername()));
+            if (this.baseMapper != null) {
+                updateById(passwordUpdate);
+            } else {
+                user.setPassword(passwordUpdate.getPassword());
+            }
         }
 
         StpUtil.login(user.getId());
         return StpUtil.getTokenValue();
     }
 
-    /** 清理当前登录态。 */
     @Override
     public void logout() {
         StpUtil.logout();
     }
 
-    /** 基于统一访问上下文获取角色编码，避免重复拼装。 */
     @Override
     public List<String> getRoleCodes(Long userId) {
         return getAccessContext(userId).getRoleCodes();
     }
 
-    /** 基于统一访问上下文获取菜单键集合。 */
     @Override
     public List<String> getMenuKeys(Long userId) {
         return getAccessContext(userId).getMenuKeys();
     }
 
-    /** 获取单个用户绑定的角色 ID。 */
     @Override
     public List<Long> getRoleIds(Long userId) {
         if (userId == null) {
-            return new ArrayList<>();
+            return new ArrayList<Long>();
         }
-        return new ArrayList<>(getRoleIdsMap(Collections.singletonList(userId))
-                .getOrDefault(userId, Collections.emptyList()));
+        return new ArrayList<Long>(getRoleIdsMap(Collections.singletonList(userId))
+                .getOrDefault(userId, Collections.<Long>emptyList()));
     }
 
-    /**
-     * 覆盖式分配角色。
-     * 先清空旧关系，再按去重后的角色列表重新写入中间表。
-     */
     @Override
     public void assignRoles(Long userId, List<Long> roleIds) {
         if (userId == null) {
@@ -140,23 +134,16 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
     }
 
-    /** 判断用户是否具备管理员语义。 */
     @Override
     public boolean isAdmin(Long userId) {
         return getAccessContext(userId).isAdmin();
     }
 
-    /** 判断用户是否具备部门负责人语义。 */
     @Override
     public boolean isDeptLeader(Long userId) {
         return getAccessContext(userId).isDeptLeader();
     }
 
-    /**
-     * 构建统一访问上下文。
-     * 这是性能优化后的关键入口，会一次性归集角色、菜单、部门和身份判断结果，
-     * 让控制器和服务在同一请求里不再反复查角色、菜单和部门负责人关系。
-     */
     @Override
     public UserAccessContext getAccessContext(Long userId) {
         UserAccessContext cachedContext = getCachedAccessContext(userId);
@@ -167,8 +154,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         UserAccessContext context = new UserAccessContext();
         context.setUserId(userId);
         if (userId == null) {
-            context.setRoleCodes(new ArrayList<>(Collections.singletonList("user")));
-            context.setMenuKeys(new ArrayList<>(USER_DEFAULT_MENUS));
+            context.setRoleCodes(new ArrayList<String>(Collections.singletonList("user")));
+            context.setMenuKeys(new ArrayList<String>(USER_DEFAULT_MENUS));
             cacheAccessContext(context);
             return context;
         }
@@ -186,11 +173,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             }
         }
 
-        List<Long> roleIds = new ArrayList<>(getRoleIdsMap(Collections.singletonList(userId))
-                .getOrDefault(userId, Collections.emptyList()));
+        List<Long> roleIds = new ArrayList<Long>(getRoleIdsMap(Collections.singletonList(userId))
+                .getOrDefault(userId, Collections.<Long>emptyList()));
         context.setRoleIds(roleIds);
 
-        List<SysRole> roles = roleIds.isEmpty() ? new ArrayList<>() : sysRoleMapper.selectBatchIds(roleIds);
+        List<SysRole> roles = roleIds.isEmpty() ? new ArrayList<SysRole>() : sysRoleMapper.selectBatchIds(roleIds);
         LinkedHashSet<String> roleCodes = roles.stream()
                 .map(SysRole::getRoleCode)
                 .filter(Objects::nonNull)
@@ -202,7 +189,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
         roleCodes.add("user");
 
-        context.setRoleCodes(new ArrayList<>(roleCodes));
+        context.setRoleCodes(new ArrayList<String>(roleCodes));
         context.setAdmin(roleCodes.contains("admin"));
 
         boolean deptLeader = roleCodes.contains("dept_leader");
@@ -212,7 +199,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
         context.setDeptLeader(deptLeader);
 
-        LinkedHashSet<String> configuredMenus = new LinkedHashSet<>();
+        LinkedHashSet<String> configuredMenus = new LinkedHashSet<String>();
         for (SysRole role : roles) {
             if (role == null || StrUtil.isBlank(role.getMenuPerms())) {
                 continue;
@@ -224,12 +211,12 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
 
         if (!configuredMenus.isEmpty()) {
-            context.setMenuKeys(new ArrayList<>(configuredMenus));
+            context.setMenuKeys(new ArrayList<String>(configuredMenus));
             cacheAccessContext(context);
             return context;
         }
 
-        LinkedHashSet<String> menuKeys = new LinkedHashSet<>();
+        LinkedHashSet<String> menuKeys = new LinkedHashSet<String>();
         if (context.isAdmin()) {
             menuKeys.addAll(ADMIN_DEFAULT_MENUS);
         } else if (context.isDeptLeader()) {
@@ -237,18 +224,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         } else {
             menuKeys.addAll(USER_DEFAULT_MENUS);
         }
-        context.setMenuKeys(new ArrayList<>(menuKeys));
+        context.setMenuKeys(new ArrayList<String>(menuKeys));
         cacheAccessContext(context);
         return context;
     }
 
-    /**
-     * 批量查询用户角色关系。
-     * 主要给分页列表等批量场景使用，避免逐行查询角色造成 N+1。
-     */
     @Override
     public Map<Long, List<Long>> getRoleIdsMap(Collection<Long> userIds) {
-        Map<Long, List<Long>> roleIdsMap = new HashMap<>();
+        Map<Long, List<Long>> roleIdsMap = new HashMap<Long, List<Long>>();
         if (userIds == null || userIds.isEmpty()) {
             return roleIdsMap;
         }
@@ -268,18 +251,14 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             if (userRole.getUserId() == null || userRole.getRoleId() == null) {
                 continue;
             }
-            roleIdsMap.computeIfAbsent(userRole.getUserId(), key -> new ArrayList<>()).add(userRole.getRoleId());
+            roleIdsMap.computeIfAbsent(userRole.getUserId(), key -> new ArrayList<Long>()).add(userRole.getRoleId());
         }
         for (Long id : normalizedUserIds) {
-            roleIdsMap.computeIfAbsent(id, key -> new ArrayList<>());
+            roleIdsMap.computeIfAbsent(id, key -> new ArrayList<Long>());
         }
         return roleIdsMap;
     }
 
-    /**
-     * 标准化角色编码。
-     * 这样可以兼容历史库里不同写法的角色编码，最终统一收敛到权限链路认识的标准值。
-     */
     private String normalizeRoleCode(String roleCode) {
         if (roleCode == null) {
             return null;

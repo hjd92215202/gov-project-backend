@@ -30,12 +30,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/**
- * 职责：验证登录控制器在 Web 层的响应结构。
- * 为什么存在：登录和 `/me` 是整个前端会话的起点，返回字段一旦变化会影响路由和权限恢复。
- * 关键输入输出：输入为登录 JSON 或 `/me` 请求，输出为包含角色与菜单的中文响应。
- * 关联链路：登录页、会话恢复、菜单权限初始化。
- */
 @ExtendWith(MockitoExtension.class)
 class LoginControllerMockMvcTest {
 
@@ -57,11 +51,8 @@ class LoginControllerMockMvcTest {
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 
-    /**
-     * 作用：验证登录接口会返回 token、角色码和菜单权限等前端关键字段。
-     */
     @Test
-    void login_shouldReturnTokenAndCurrentUserPayload() throws Exception {
+    void login_shouldReturnCurrentUserPayload() throws Exception {
         Map<String, String> payload = new HashMap<String, String>();
         payload.put("username", "admin");
         payload.put("password", "secret");
@@ -93,16 +84,12 @@ class LoginControllerMockMvcTest {
                             .content(objectMapper.writeValueAsString(payload)))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$.code").value(200))
-                    .andExpect(jsonPath("$.data.tokenValue").value("token-1"))
-                    .andExpect(jsonPath("$.data.tokenName").value("Authorization"))
+                    .andExpect(jsonPath("$.data.tokenValue").doesNotExist())
                     .andExpect(jsonPath("$.data.roleCodes", hasSize(2)))
                     .andExpect(jsonPath("$.data.menuKeys[0]").value("dashboard:view"));
         }
     }
 
-    /**
-     * 作用：验证 `/me` 接口会返回当前用户信息，但不会重复暴露 token 字段。
-     */
     @Test
     void me_shouldReturnCurrentUserWithoutTokenFields() throws Exception {
         UserAccessContext context = new UserAccessContext();

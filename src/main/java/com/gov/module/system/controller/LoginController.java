@@ -2,6 +2,7 @@ package com.gov.module.system.controller;
 
 import cn.dev33.satoken.stp.StpUtil;
 import com.gov.common.result.R;
+import com.gov.common.security.CsrfTokenManager;
 import com.gov.module.system.dto.LoginDTO;
 import com.gov.module.system.entity.SysDept;
 import com.gov.module.system.entity.SysUser;
@@ -16,6 +17,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import javax.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,36 +37,59 @@ public class LoginController {
     @Autowired
     private SysDeptService sysDeptService;
 
+    @Autowired(required = false)
+    private CsrfTokenManager csrfTokenManager;
+
     @ApiOperation("用户登录")
     @PostMapping("/login")
-    public R<Map<String, Object>> login(@Valid @RequestBody LoginDTO loginBody) {
+    public R<Map<String, Object>> login(@Valid @RequestBody LoginDTO loginBody,
+                                        HttpServletRequest request,
+                                        HttpServletResponse response) {
         long startAt = System.currentTimeMillis();
         String username = loginBody.getUsername();
-        String token = sysUserService.login(username, loginBody.getPassword());
+        sysUserService.login(username, loginBody.getPassword());
         Long userId = StpUtil.getLoginIdAsLong();
-        Map<String, Object> payload = buildCurrentUserPayload(userId, token);
-        perfLog.info("action=login userId={} username={} durationMs={}", userId, username, System.currentTimeMillis() - startAt);
+        if (csrfTokenManager != null && response != null) {
+            csrfTokenManager.ensureToken(request, response);
+        }
+        Map<String, Object> payload = buildCurrentUserPayload(userId);
+        perfLog.info("action=login userId={} username={} durationMs={}",
+                userId, username, System.currentTimeMillis() - startAt);
         return R.ok(payload, "登录成功");
     }
 
     @ApiOperation("获取当前用户信息")
     @GetMapping("/me")
-    public R<Map<String, Object>> me() {
+    public R<Map<String, Object>> me(HttpServletRequest request, HttpServletResponse response) {
         long startAt = System.currentTimeMillis();
         Long userId = StpUtil.getLoginIdAsLong();
-        Map<String, Object> payload = buildCurrentUserPayload(userId, null);
+        if (csrfTokenManager != null && response != null) {
+            csrfTokenManager.ensureToken(request, response);
+        }
+        Map<String, Object> payload = buildCurrentUserPayload(userId);
         perfLog.info("action=me userId={} durationMs={}", userId, System.currentTimeMillis() - startAt);
         return R.ok(payload);
     }
 
     @ApiOperation("退出登录")
     @PostMapping("/logout")
-    public R<String> logout() {
+    public R<String> logout(HttpServletResponse response) {
         sysUserService.logout();
+        if (csrfTokenManager != null && response != null) {
+            csrfTokenManager.clearToken(response);
+        }
         return R.ok("退出登录成功");
     }
 
-    private Map<String, Object> buildCurrentUserPayload(Long userId, String tokenValue) {
+    public R<Map<String, Object>> login(LoginDTO loginBody) {
+        return login(loginBody, null, null);
+    }
+
+    public R<Map<String, Object>> me() {
+        return me(null, null);
+    }
+
+    private Map<String, Object> buildCurrentUserPayload(Long userId) {
         UserAccessContext accessContext = sysUserService.getAccessContext(userId);
         String username = accessContext.getUsername();
         String realName = accessContext.getRealName();
@@ -87,10 +113,6 @@ public class LoginController {
         }
 
         Map<String, Object> result = new HashMap<String, Object>();
-        if (tokenValue != null) {
-            result.put("tokenValue", tokenValue);
-            result.put("tokenName", "Authorization");
-        }
         result.put("userId", userId);
         result.put("username", username);
         result.put("realName", realName);
