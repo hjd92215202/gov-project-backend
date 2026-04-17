@@ -1,0 +1,52 @@
+spring:
+  datasource:
+    url: ${GOV_DB_URL}
+    username: ${GOV_DB_USERNAME}
+    password: ${GOV_DB_PASSWORD}
+    driver-class-name: ${GOV_DB_DRIVER_CLASS_NAME:org.mariadb.jdbc.Driver}
+    hikari:
+      connection-init-sql: SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci
+      maximum-pool-size: ${GOV_DB_POOL_MAX:20}
+      minimum-idle: ${GOV_DB_POOL_MIN:5}
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      keepalive-time: 60000
+      pool-name: GovHikariPool
+      leak-detection-threshold: 60000
+
+minio:
+  endpoint: ${GOV_MINIO_ENDPOINT}
+  public-endpoint: ${GOV_MINIO_PUBLIC_ENDPOINT}
+  access-key: ${GOV_MINIO_ACCESS_KEY}
+  secret-key: ${GOV_MINIO_SECRET_KEY}
+  bucket-name: ${GOV_MINIO_BUCKET_NAME:gov-files}
+
+sa-token:
+  cookie:
+    secure: ${GOV_AUTH_COOKIE_SECURE:true}
+
+gov:
+  security:
+    csrf:
+      enabled: ${GOV_CSRF_ENABLED:true}
+      cookie-name: ${GOV_CSRF_COOKIE_NAME:XSRF-TOKEN}
+      header-name: ${GOV_CSRF_HEADER_NAME:X-CSRF-Token}
+    sm4:
+      key: ${GOV_SM4_KEY}
+      enabled: ${GOV_SM4_ENABLED:true}
+      allow-plaintext-fallback: ${GOV_SM4_ALLOW_PLAINTEXT_FALLBACK:false}
+    password:
+      pepper: ${GOV_PASSWORD_PEPPER:}
+    trusted-proxies: ${GOV_TRUSTED_PROXY_SOURCES:}
+  rate-limit:
+    enabled: ${GOV_RATE_LIMIT_ENABLED:true}
+    max-requests-per-second: ${GOV_RATE_LIMIT_RPS:30}
+    burst-capacity: ${GOV_RATE_LIMIT_BURST:60}
+
+logging:
+  file:
+    path: /opt/peoplesAirDefence/logs
+  level:
+    root: ${LOGGING_LEVEL_ROOT:INFO}
+    com.gov.audit: ${LOGGING_LEVEL_COM_GOV_AUDIT:INFO}
