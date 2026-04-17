@@ -1,0 +1,5 @@
+/opt/peoplesAirDefence/etc/application.yml
+/opt/peoplesAirDefence/etc/application-prod.yml
+/opt/peoplesAirDefence/etc/logback-spring.xml
+/opt/peoplesAirDefence/etc/gov-backend.env
+/etc/systemd/system/multi-user.target.wants/gov-backend.service

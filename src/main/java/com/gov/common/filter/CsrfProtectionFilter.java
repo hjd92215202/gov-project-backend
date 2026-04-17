@@ -1,5 +1,6 @@
 package com.gov.common.filter;
 
+import cn.dev33.satoken.exception.NotWebContextException;
 import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.StrUtil;
 import com.gov.common.security.CsrfTokenManager;
@@ -26,6 +27,7 @@ import java.io.IOException;
 public class CsrfProtectionFilter extends OncePerRequestFilter {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CsrfProtectionFilter.class);
+    private static final String API_CONTEXT_PREFIX = "/api";
 
     @Autowired
     private CsrfTokenManager csrfTokenManager;
@@ -46,19 +48,21 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
             return true;
         }
         String uri = StrUtil.blankToDefault(request.getRequestURI(), "");
-        if (uri.startsWith("/system/login") || uri.startsWith("/health/live") || uri.startsWith("/health/ready")) {
+        if (isWhitelistedUri(uri, "/system/login")
+                || isWhitelistedUri(uri, "/health/live")
+                || isWhitelistedUri(uri, "/health/ready")) {
             return true;
         }
-        return apiDocsEnabled && (uri.startsWith("/doc.html")
-                || uri.startsWith("/webjars/")
-                || uri.startsWith("/swagger-resources/")
-                || uri.startsWith("/v2/api-docs"));
+        return apiDocsEnabled && (isWhitelistedUri(uri, "/doc.html")
+                || isWhitelistedUri(uri, "/webjars/")
+                || isWhitelistedUri(uri, "/swagger-resources/")
+                || isWhitelistedUri(uri, "/v2/api-docs"));
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        if (!StpUtil.isLogin()) {
+        if (!isLoginSafely(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -76,5 +80,28 @@ public class CsrfProtectionFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isLoginSafely(HttpServletRequest request) {
+        try {
+            return StpUtil.isLogin();
+        } catch (NotWebContextException exception) {
+            LOGGER.debug("Skip CSRF check because Sa-Token web context is unavailable uri={} message={}",
+                    request == null ? null : request.getRequestURI(), exception.getMessage());
+            return false;
+        } catch (RuntimeException exception) {
+            LOGGER.warn("Skip CSRF check due to unexpected login state failure uri={} message={}",
+                    request == null ? null : request.getRequestURI(), exception.getMessage());
+            return false;
+        }
+    }
+
+    private boolean isWhitelistedUri(String requestUri, String rawPath) {
+        String uri = StrUtil.blankToDefault(requestUri, "");
+        String path = StrUtil.blankToDefault(rawPath, "");
+        if (StrUtil.isBlank(uri) || StrUtil.isBlank(path)) {
+            return false;
+        }
+        return uri.startsWith(path) || uri.startsWith(API_CONTEXT_PREFIX + path);
     }
 }

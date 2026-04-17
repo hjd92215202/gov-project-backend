@@ -7,11 +7,11 @@
 param(
     [string]$command = "help"
 )
-
+[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 # ==================== 环境变量配置 ====================
 $env:GOV_SM4_KEY = "1234567812345678"
-#密码加盐值 aB3$xK9@mL2#pQ7&vN5!wR8%
-$env:GOV_PASSWORD_PEPPER = ""
+#密码加盐值  
+$env:GOV_PASSWORD_PEPPER = 'aB3$xK9@mL2#pQ7&vN5!wR8%'
 $env:GOV_DB_URL = "jdbc:mariadb://localhost:13306/gov_db?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_unicode_ci&serverTimezone=GMT%2B8&useSSL=false&allowPublicKeyRetrieval=true&useInformationSchema=true"
 $env:GOV_DB_USERNAME = "db_user"
 $env:GOV_DB_PASSWORD = "Egov@123"

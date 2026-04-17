@@ -37,8 +37,14 @@ gov:
       enabled: ${GOV_SM4_ENABLED:true}
       allow-plaintext-fallback: ${GOV_SM4_ALLOW_PLAINTEXT_FALLBACK:false}
     password:
-      pepper: ${GOV_PASSWORD_PEPPER:}
+      pepper: ${GOV_PASSWORD_PEPPER:aB3$xK9@mL2#pQ7&vN5!wR8%}
     trusted-proxies: ${GOV_TRUSTED_PROXY_SOURCES:}
+  bootstrap:
+    enabled: ${GOV_BOOTSTRAP_ENABLED:true}
+    force-reset-admin-on-first-start: ${GOV_BOOTSTRAP_FORCE_RESET_ADMIN_ON_FIRST_START:true}
+    admin:
+      username: ${GOV_BOOTSTRAP_ADMIN_USERNAME:admin}
+      initial-password: ${GOV_BOOTSTRAP_ADMIN_INITIAL_PASSWORD:admin123}
   rate-limit:
     enabled: ${GOV_RATE_LIMIT_ENABLED:true}
     max-requests-per-second: ${GOV_RATE_LIMIT_RPS:30}

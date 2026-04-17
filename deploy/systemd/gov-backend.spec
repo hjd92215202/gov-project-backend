@@ -1,102 +1,76 @@
 Name:           gov-project-backend
-Version:        1.0.0
-Release:        1%{?dist}
+Version:        %{?pkg_version}%{!?pkg_version:1.0.0}
+Release:        %{?pkg_release}%{!?pkg_release:1}%{?dist}
 Summary:        Government Project Backend Service
 License:        Proprietary
+BuildArch:      aarch64
+Source0:        %{name}-%{version}.tar.gz
+
+Requires(post): /bin/bash
+Requires(post): systemd
+Requires(preun): /bin/bash
+Requires(preun): systemd
+Requires(postun): /bin/bash
+Requires(postun): systemd
 
 %description
 Government Project Backend Service - Spring Boot Application
 
 %prep
-# 源代码已在构建前准备
+%setup -q
 
 %build
-cd %{_builddir}/%{name}-%{version}
-mvn clean package -DskipTests
+# Prebuilt binary package. No source compilation in RPM build stage.
 
 %install
-# 创建目录结构
-mkdir -p %{buildroot}/opt/peoplesAirDefence/bin
-mkdir -p %{buildroot}/opt/peoplesAirDefence/config
-mkdir -p %{buildroot}/opt/peoplesAirDefence/logs
-mkdir -p %{buildroot}/usr/lib/systemd/system
+rm -rf %{buildroot}
 
-# 复制JAR文件
-cp %{_builddir}/%{name}-%{version}/target/gov-project-backend-*.jar %{buildroot}/opt/peoplesAirDefence/app.jar
+install -d %{buildroot}/opt/peoplesAirDefence/bin
+install -d %{buildroot}/opt/peoplesAirDefence/etc
+install -d %{buildroot}/opt/peoplesAirDefence/doc
+install -d %{buildroot}/opt/peoplesAirDefence/data
+install -d %{buildroot}/opt/peoplesAirDefence/logs
+install -d %{buildroot}/lib/systemd/system
 
-# 复制启动脚本
-cp %{_builddir}/%{name}-%{version}/deploy/systemd/start.sh %{buildroot}/opt/peoplesAirDefence/bin/
-chmod +x %{buildroot}/opt/peoplesAirDefence/bin/start.sh
+install -m 0644 target/gov-project-backend-%{version}.jar %{buildroot}/opt/peoplesAirDefence/app.jar
+install -m 0755 deploy/systemd/start.sh %{buildroot}/opt/peoplesAirDefence/bin/start.sh
+install -m 0755 deploy/systemd/rpm-hooks.sh %{buildroot}/opt/peoplesAirDefence/bin/rpm-hooks.sh
+install -m 0644 deploy/systemd/gov-backend.service %{buildroot}/lib/systemd/system/gov-backend.service
 
-# 复制systemd service文件
-cp %{_builddir}/%{name}-%{version}/deploy/systemd/gov-backend.service %{buildroot}/usr/lib/systemd/system/
-
-# 复制配置文件（标记为config，支持更新时保留用户修改）
-cp %{_builddir}/%{name}-%{version}/src/main/resources/application.yml %{buildroot}/opt/peoplesAirDefence/config/application.yml.default
-cp %{_builddir}/%{name}-%{version}/src/main/resources/application-prod.yml %{buildroot}/opt/peoplesAirDefence/config/application-prod.yml.default
-cp %{_builddir}/%{name}-%{version}/src/main/resources/logback-spring.xml %{buildroot}/opt/peoplesAirDefence/config/logback-spring.xml.default
-cp %{_builddir}/%{name}-%{version}/deploy/systemd/gov-backend.env.example %{buildroot}/opt/peoplesAirDefence/config/gov-backend.env.example
+install -m 0644 src/main/resources/application.yml %{buildroot}/opt/peoplesAirDefence/etc/application.yml.default
+install -m 0644 src/main/resources/application-prod.yml %{buildroot}/opt/peoplesAirDefence/etc/application-prod.yml.default
+install -m 0644 src/main/resources/logback-spring.xml %{buildroot}/opt/peoplesAirDefence/etc/logback-spring.xml.default
+install -m 0644 deploy/systemd/gov-backend.env.example %{buildroot}/opt/peoplesAirDefence/etc/gov-backend.env.example
+install -m 0644 deploy/systemd/extrafilelist.txt %{buildroot}/opt/peoplesAirDefence/doc/extrafilelist.txt
 
 %files
 /opt/peoplesAirDefence/app.jar
 /opt/peoplesAirDefence/bin/start.sh
-/usr/lib/systemd/system/gov-backend.service
-%config(noreplace) /opt/peoplesAirDefence/config/application.yml.default
-%config(noreplace) /opt/peoplesAirDefence/config/application-prod.yml.default
-%config(noreplace) /opt/peoplesAirDefence/config/logback-spring.xml.default
-/opt/peoplesAirDefence/config/gov-backend.env.example
+/opt/peoplesAirDefence/bin/rpm-hooks.sh
+/lib/systemd/system/gov-backend.service
+%config(noreplace) /opt/peoplesAirDefence/etc/application.yml.default
+%config(noreplace) /opt/peoplesAirDefence/etc/application-prod.yml.default
+%config(noreplace) /opt/peoplesAirDefence/etc/logback-spring.xml.default
+%config(noreplace) /opt/peoplesAirDefence/etc/gov-backend.env.example
+%config(noreplace) /opt/peoplesAirDefence/doc/extrafilelist.txt
+%dir /opt/peoplesAirDefence/data
 %dir /opt/peoplesAirDefence/logs
 
 %post
-# 创建服务用户
-useradd -r -s /bin/false gov-backend 2>/dev/null || true
-
-# 设置权限
-chown -R gov-backend:gov-backend /opt/peoplesAirDefence
-chmod -R 755 /opt/peoplesAirDefence
-
-# 首次安装时复制配置文件
-if [ ! -f /opt/peoplesAirDefence/config/application.yml ]; then
-    cp /opt/peoplesAirDefence/config/application.yml.default /opt/peoplesAirDefence/config/application.yml
-    chown gov-backend:gov-backend /opt/peoplesAirDefence/config/application.yml
-    chmod 644 /opt/peoplesAirDefence/config/application.yml
-fi
-
-if [ ! -f /opt/peoplesAirDefence/config/application-prod.yml ]; then
-    cp /opt/peoplesAirDefence/config/application-prod.yml.default /opt/peoplesAirDefence/config/application-prod.yml
-    chown gov-backend:gov-backend /opt/peoplesAirDefence/config/application-prod.yml
-    chmod 644 /opt/peoplesAirDefence/config/application-prod.yml
-fi
-
-if [ ! -f /opt/peoplesAirDefence/config/logback-spring.xml ]; then
-    cp /opt/peoplesAirDefence/config/logback-spring.xml.default /opt/peoplesAirDefence/config/logback-spring.xml
-    chown gov-backend:gov-backend /opt/peoplesAirDefence/config/logback-spring.xml
-    chmod 644 /opt/peoplesAirDefence/config/logback-spring.xml
-fi
-
-if [ ! -f /opt/peoplesAirDefence/config/gov-backend.env ]; then
-    cp /opt/peoplesAirDefence/config/gov-backend.env.example /opt/peoplesAirDefence/config/gov-backend.env
-    chown gov-backend:gov-backend /opt/peoplesAirDefence/config/gov-backend.env
-    chmod 600 /opt/peoplesAirDefence/config/gov-backend.env
-fi
-
-# 重新加载systemd
-systemctl daemon-reload
-
-echo "Installation complete. To start the service:"
-echo "  1. Edit /opt/peoplesAirDefence/config/gov-backend.env with your production values"
-echo "  2. systemctl start gov-backend"
-echo "  3. systemctl enable gov-backend"
+/bin/bash /opt/peoplesAirDefence/bin/rpm-hooks.sh post "$1" || true
 
 %preun
-# 停止服务
-systemctl stop gov-backend 2>/dev/null || true
-systemctl disable gov-backend 2>/dev/null || true
+if [ -x /opt/peoplesAirDefence/bin/rpm-hooks.sh ]; then
+    /bin/bash /opt/peoplesAirDefence/bin/rpm-hooks.sh preun "$1" || true
+fi
 
 %postun
-# 删除服务用户
-userdel gov-backend 2>/dev/null || true
+if [ -x /opt/peoplesAirDefence/bin/rpm-hooks.sh ]; then
+    /bin/bash /opt/peoplesAirDefence/bin/rpm-hooks.sh postun "$1" || true
+else
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
 
 %changelog
-* Mon Apr 17 2026 Admin <admin@example.com> - 1.0.0-1
-- Initial release
+* Fri Apr 17 2026 Admin <admin@example.com> - 1.0.0-1
+- ARM-first RPM packaging with external lifecycle hooks

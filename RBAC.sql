@@ -154,4 +154,4 @@ INSERT INTO sys_dept (id, parent_id, dept_name)
 VALUES (1, 0, '综合部门');
 
 INSERT INTO sys_user (id, dept_id, username, password, real_name, status, deleted)
-VALUES (1, 1, 'admin', '66d7edc85a32d756ffef0046a56cf78060276b6beb3f02de7916c01ad54ea6b0', '超级管理员', 1, 0);
+VALUES (1, 1, 'admin', '$2a$12$dYc0oJxcjG21jAaE.Zq/cedhCPikTIUGfou2VG8ojM6LuIWbmqnCy', '超级管理员', 1, 0);
